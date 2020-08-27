@@ -17,7 +17,7 @@ namespace TpLinkDataRate
                 {
                     services.AddHostedService<Worker>();
                     //services.AddSingleton<IRestClient, RestClient>();
-                    services.AddSingleton<ITpLinkClient>(new TpLinkClient("admin", "2207psp"));
+                    services.AddSingleton<ITpLinkClient>(new TpLinkClient("admin", "2207psp", "http://192.168.1.86/"));
                 });
     }
 }
