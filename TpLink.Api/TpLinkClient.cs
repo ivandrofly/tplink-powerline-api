@@ -1,7 +1,8 @@
-﻿using RestSharp;
-using RestSharp.Serializers.SystemTextJson;
+﻿using Newtonsoft.Json.Linq;
+using RestSharp;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
@@ -9,7 +10,6 @@ using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using TpLink.Api.Helpers;
 using TpLink.Api.Models;
-using TpLink.Api.PropertyNamingPolicy;
 using TpLink.Models;
 
 namespace TpLink.Api
@@ -23,6 +23,7 @@ namespace TpLink.Api
         {
         }
 
+        [Obsolete]
         public TpLinkClient(string login, string password, string endpoint)
         {
             restClient = new RestClient(endpoint)
@@ -49,7 +50,9 @@ namespace TpLink.Api
                     // new Parameter("Authorization", "Basic%20admin%3A656a351961b7552d9bb35a0201b6d6fd", ParameterType.Cookie),
                     new Parameter("Authorization", $"{StringUtils.GetAuthorization(login, password)}", ParameterType.Cookie),
                     new Parameter("DNT", "1", ParameterType.HttpHeader),
-                }
+                },
+
+                Timeout = (int)TimeSpan.FromSeconds(10).TotalMilliseconds
             };
 
             // default option
@@ -69,7 +72,7 @@ namespace TpLink.Api
         /// <summary>
         /// Get System logs
         /// </summary>
-        public async Task<TpLinkData<List<SystemLog>>> GetSystemLogsAsync()
+        public async Task<TpLinkResponse<List<SystemLog>>> GetSystemLogsAsync()
         {
             // build the system log
             var req = new RestRequest("admin/syslog", Method.POST)
@@ -86,8 +89,8 @@ namespace TpLink.Api
             // note: since the response comes wiht "content-type: text/html" it json parser will fail to parse it
             var response = await restClient.ExecuteAsync(req);
             // use system json serializer
-            var instance = JsonSerializer.Deserialize<TpLinkData<List<SystemLog>>>(response.Content, jsonOption);
-            return instance;
+            var instance = JsonSerializer.Deserialize<TpLinkResponse<List<SystemLog>>>(response.Content, jsonOption);
+            return instance ?? new TpLinkResponse<List<SystemLog>>();
         }
 
         /// <summary>
@@ -96,7 +99,7 @@ namespace TpLink.Api
         //public async Task<TpLinkClientData> GetClientsAsync()
         public async Task<TpLinkClientData> GetClientsAsync()
         {
-            var statusRequest = new RestRequest("admin/wireless", Method.POST)
+            var wirelessClientReq = new RestRequest("admin/wireless", Method.POST)
             {
                 RequestFormat = DataFormat.None,
                 Parameters =
@@ -111,30 +114,43 @@ namespace TpLink.Api
             // use system json serializer
             // IMPORTANT: TP-LINK SERVER DOESN'T RETURN THE CORRECT CONTENT TYPE WHICH
             // MAKE THE JSONSERIALIZER TO USE THE XML BY DEFAULT
-            var response = await restClient.ExecuteAsync(statusRequest);
+            IRestResponse response = await restClient.ExecuteAsync(wirelessClientReq);
+
+            // faulty response
+            //var doc = JsonDocument.Parse(response.Content, new JsonDocumentOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
+            //if (doc.RootElement.GetProperty("success").GetBoolean() == true)
+            //{
+            //    Console.WriteLine("failed");
+            //}
+
             return JsonSerializer.Deserialize<TpLinkClientData>(response.Content, jsonOption);
         }
 
         /// <summary>
         /// Get powerline status, including transfer and received data rate
         /// </summary>
-        public async Task<TpLinkData<PowerlineDevices>> GetPowerlineDevicesStatusAsync()
+        public async Task<TpLinkResponse<PowerlineDevices>> GetPowerlineDevicesStatusAsync()
         {
             var powerLineStatusRequest = new RestRequest("admin/powerline", Method.POST)
             {
                 RequestFormat = DataFormat.None,
-                Parameters =
-                {
-                    new Parameter("form", "plc_device", ParameterType.QueryString),
-                    new Parameter("operation", "load", ParameterType.GetOrPost),
-                }
+
+                // deprecated
+                //Parameters =
+                //{
+                //    new Parameter("form", "plc_device", ParameterType.QueryString),
+                //    new Parameter("operation", "load", ParameterType.GetOrPost),
+                //}
             };
+
+            powerLineStatusRequest.AddQueryParameter("form", "plc_device");
+            powerLineStatusRequest.AddParameter("operation", "load", ParameterType.GetOrPost);
 
             // IMPORTANT: TP-LINK SERVER RETURNS WRONG CONTENT TYPE (TEXT/HTML) WHICH INVOKES XML SERIALIZER BY DEFAULT
             //var response = await restClient.ExecuteAsync<TpLinkData<SystemLog>>(powerLineStatusRequest);
 
             var response = await restClient.ExecuteAsync(powerLineStatusRequest);
-            return JsonSerializer.Deserialize<TpLinkData<PowerlineDevices>>(response.Content, jsonOption);
+            return JsonSerializer.Deserialize<TpLinkResponse<PowerlineDevices>>(response.Content, jsonOption);
         }
 
         /// <summary>
@@ -146,32 +162,66 @@ namespace TpLink.Api
             return clients.Data.Count;
         }
 
-        public async Task<TpLinkData<WirelessModel>> GetWirelessBand2GAsync()
+        public async Task<TpLinkResponse<WirelessModel>> GetWirelessBand2GAsync()
         {
             var req = new RestRequest("admin/wireless", Method.POST);
             req.AddQueryParameter("form", "wireless_2g");
             req.AddParameter("operation", "read", ParameterType.GetOrPost);
             var res = await restClient.ExecuteAsync(req);
-            return JsonSerializer.Deserialize<TpLinkData<WirelessModel>>(res.Content, jsonOption);
+
+            // NOTE: THIS SEEMS TO BE POSSIBLE WITH NETWORNSOFT JSON JProperty
+            var jdoc = JsonDocument.Parse(res.Content);
+
+            //var jdoc = JObject.Parse(res.Content);
+            //var r = jdoc.SelectToken("data");
+
+            //jdoc.Root.
+
+            var jp = jdoc.RootElement.GetProperty("data");
+
+            //req.AddJsonBody(new { name = new { data = ""} });
+
+            //if (jp.GetProperty("enable").GetString().Equals("off"))
+            //{
+            //    jp.GetProperty("enable");
+            //}
+            //else
+            //{
+            //}
+
+            //jdoc.RootElement.GetProperty("enable").
+
+            // todo: still string
+            //dynamic instance = JsonSerializer.Deserialize<dynamic>(res.Content);
+            //bool success = (bool)instance["success"];
+
+            return JsonSerializer.Deserialize<TpLinkResponse<WirelessModel>>(res.Content, jsonOption);
         }
 
-        public async Task<TpLinkData<WirelessModel>> ChangeWireless2GStatusAsync(bool enabled)
+        public async Task<TpLinkResponse<WirelessModel>> ChangeWireless2GStatusAsync(bool enabled)
         {
             var tpLinkDataWM = await GetWirelessBand2GAsync();
             var req = new RestRequest("admin/wireless", Method.POST)
             {
                 //RequestFormat = DataFormat.Json
+                //Parameters =
+                //{
+                //    new Parameter("form", "wireless_2g", ParameterType.QueryString),
+                //    new Parameter("enable", "write", ParameterType.GetOrPost)
+                //}
             };
 
             req.AddQueryParameter("form", "wireless_2g");
             //req.AddParameter("enable", enabled ? "on" : "off", ParameterType.GetOrPost);
             req.AddParameter("operation", "write", ParameterType.GetOrPost);
 
+            //goto required_only;
+
             // change the data 
             tpLinkDataWM.Data.Enable = enabled ? "on" : "off";
 
             // map the prop name and value to a dictionary
-            var dictionary = tpLinkDataWM.Data.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            Dictionary<string, string> dictionary = tpLinkDataWM.Data.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance)
                  .ToDictionary(prop =>
                  {
                      var jsonProp = prop.GetCustomAttribute<JsonPropertyNameAttribute>(true);
@@ -180,11 +230,15 @@ namespace TpLink.Api
 
             // trying to add dictionary with "AddObject" throws exception
             // req.AddObject(dictionary);
-            foreach (var kvp in dictionary)
+            foreach (KeyValuePair<string, string> kvp in dictionary)
             {
                 req.AddParameter(kvp.Key, kvp.Value, ParameterType.GetOrPost); // working 
-                req.AddParameter(kvp.Key, kvp.Value);
+                //req.AddParameter(kvp.Key, kvp.Value);
             }
+
+            // uncommnet line 200 (goto)
+            //required_only:
+            //    req.AddParameter("enable", enabled ? "on" : "off", ParameterType.GetOrPost);
 
             // workaround:
             // add by one and convert the prop-name?
@@ -197,12 +251,28 @@ namespace TpLink.Api
             return null;
         }
 
-        public Task<WirelessModel> ChangeWireless5GStatus(bool enabled)
+        public async Task<TpLinkResponse<WirelessModel>> ChangeWireless5GStatusAsync(bool enabled)
         {
-            throw new NotImplementedException();
+            var req = new RestRequest("admin/wireless", Method.POST);
+            req.AddQueryParameter("form", "wireless_5g");
+
+            req.AddParameter("operation", "write", ParameterType.GetOrPost);
+            req.AddParameter("enable", enabled ? "on" : "off", ParameterType.GetOrPost);
+            req.AddParameter("ssid", "TP-LINK_2BDA_5G", ParameterType.GetOrPost);
+            req.AddParameter("hidden", "off", ParameterType.GetOrPost);
+            req.AddParameter("psk_key", "93608305", ParameterType.GetOrPost);
+            req.AddParameter("encryption", "psk", ParameterType.GetOrPost);
+            req.AddParameter("psk_version", "auto", ParameterType.GetOrPost);
+            req.AddParameter("psk_cipher", "auto", ParameterType.GetOrPost);
+            req.AddParameter("hwmode", "a", ParameterType.GetOrPost);
+            req.AddParameter("htmode", "80", ParameterType.GetOrPost);
+            req.AddParameter("channel", "auto", ParameterType.GetOrPost);
+            req.AddParameter("txpower", "low", ParameterType.GetOrPost);
+            var res = await restClient.ExecuteAsync(req);
+            return JsonSerializer.Deserialize<TpLinkResponse<WirelessModel>>(res.Content, jsonOption);
         }
 
-        public async Task<TpLinkData<WifiMove>> WifiMoveAsync(bool enabled)
+        public async Task<TpLinkResponse<WifiMove>> WifiMoveAsync(bool enabled)
         {
             var req = new RestRequest("/admin/wifiMove.json", Method.POST)
             {
@@ -216,8 +286,23 @@ namespace TpLink.Api
 
             // TODO: NOT WORKING, BUT THE REQUEST LOOKS THE SAME AS FROM CHROME BROWSER!
             var res = await restClient.ExecuteAsync(req);
-            var data = JsonSerializer.Deserialize<TpLinkData<WifiMove>>(res.Content, jsonOption);
+            var data = JsonSerializer.Deserialize<TpLinkResponse<WifiMove>>(res.Content, jsonOption);
             return data;
+        }
+
+        public async Task<TpLinkResponse<bool>> RebootAsync()
+        {
+            var req = new RestRequest("/admin/reboot.json", Method.POST)
+            {
+                RequestFormat = DataFormat.None,
+                Parameters =
+                {
+                    new Parameter("operation", "write", ParameterType.GetOrPost),
+                }
+            };
+
+            var response = await restClient.ExecuteAsync(req);
+            return await Task.FromResult(new TpLinkResponse<bool> { Data = true });
         }
 
         // action method

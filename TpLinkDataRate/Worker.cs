@@ -1,19 +1,8 @@
-using System;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Linq.Expressions;
-using System.Reflection.Metadata.Ecma335;
-using System.Text;
-using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using RestSharp;
-using RestSharp.Authenticators;
-using RestSharp.Extensions;
-using RestSharp.Serialization.Json;
-using RestSharp.Serializers.SystemTextJson;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 using TpLink.Api;
 
 namespace TpLinkDataRate
@@ -45,16 +34,39 @@ namespace TpLinkDataRate
                 //var response = await restClient.ExecuteAsync<object>(powerLineStatusRequest);
                 //var data = System.Text.Json.JsonSerializer.Deserialize<TpLinkClientData>(response.Content, jsonOptions);
                 //_logger.LogInformation(data.Datas.Last().ToString());
-                var res = await _tpLinkClient.GetClientsAsync();
-                var res2 = await _tpLinkClient.WifiMoveAsync(true);
 
-                //_logger.LogInformation(result.Data.FirstOrDefault().DeviceName);
-                _logger.LogInformation("reading system log");
-                foreach (var item in (await _tpLinkClient.GetSystemLogsAsync()).Data)
+                var result = await _tpLinkClient.ChangeWireless5GStatusAsync(false);
+
+
+                var res = await _tpLinkClient.GetClientsAsync();
+
+                // note: if exception, close the web-page on browse and make sure wi-fi is one and at least one device is connected to powerline
+                foreach (var client in res?.Data)
                 {
-                    Console.WriteLine(item.ToString());
+                    Console.WriteLine(client.DeviceName);
                 }
-                await Task.Delay(1000 * 10, stoppingToken);
+
+                Console.WriteLine("done");
+                Console.ReadLine();
+
+                // test wifi-move
+                //var res2 = await _tpLinkClient.WifiMoveAsync(true);
+
+
+                // test reboot
+                // note: the turn off is scheduled, powerline won't turn the wi-fi one by default
+                await _tpLinkClient.RebootAsync();
+
+                Console.ReadLine();
+
+                // test system log
+                //_logger.LogInformation(result.Data.FirstOrDefault().DeviceName);
+                //_logger.LogInformation("reading system log");
+                //foreach (var item in (await _tpLinkClient.GetSystemLogsAsync()).Data)
+                //{
+                //    Console.WriteLine(item.ToString());
+                //}
+                //await Task.Delay(1000 * 10, stoppingToken);
                 //Console.Clear();
             }
         }
