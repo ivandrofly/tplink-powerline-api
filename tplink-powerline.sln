@@ -5,9 +5,14 @@ VisualStudioVersion = 16.0.29926.136
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TpLink.Service", "TpLinkDataRate\TpLink.Service.csproj", "{9C6B41CB-CC38-47A7-96CB-23A98D9B1CF8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TpLink.Api", "TpLink.Api\TpLink.Api.csproj", "{23A6BBAF-8E73-4907-973B-0B97BF21E1E4}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TpLink.Api", "TpLink.Api\TpLink.Api.csproj", "{23A6BBAF-8E73-4907-973B-0B97BF21E1E4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TpLink.UnitTest", "TpLink.UnitTest\TpLink.UnitTest.csproj", "{D00908BA-F3AA-4F1D-B4E9-6BA10F3C6386}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TpLink.UnitTest", "TpLink.UnitTest\TpLink.UnitTest.csproj", "{D00908BA-F3AA-4F1D-B4E9-6BA10F3C6386}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{674B6B37-7157-434D-A544-108B7FE9007E}"
+	ProjectSection(SolutionItems) = preProject
+		readme.txt = readme.txt
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

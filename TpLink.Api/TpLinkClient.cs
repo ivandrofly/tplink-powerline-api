@@ -4,7 +4,11 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Reflection;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
@@ -16,7 +20,7 @@ namespace TpLink.Api
 {
     public class TpLinkClient : ITpLinkClient
     {
-        private readonly RestClient restClient;
+        private readonly RestClient powerlineClient;
         private readonly JsonSerializerOptions jsonOption;
 
         public TpLinkClient() : this("admin", "admin", "192.168.1.1")
@@ -26,7 +30,7 @@ namespace TpLink.Api
         [Obsolete]
         public TpLinkClient(string login, string password, string endpoint)
         {
-            restClient = new RestClient(endpoint)
+            powerlineClient = new RestClient(endpoint)
             {
                 // NOTE: Whne the version of the user agent change, this may need to be changed aswell
                 // the entire request may be okay, but when the user agent's version changed, this may need to be updated aswell
@@ -61,6 +65,8 @@ namespace TpLink.Api
                 IgnoreNullValues = true,
                 PropertyNameCaseInsensitive = true,
                 WriteIndented = true,
+                AllowTrailingCommas = true,
+                ReadCommentHandling = JsonCommentHandling.Skip
                 // note: wont work when sending the request, since the request ain't sent as json! :(
                 //PropertyNamingPolicy = new TpLinkPropertyNamingPolicy(),
             };
@@ -87,7 +93,7 @@ namespace TpLink.Api
 
             // rest thee response from the http response and try to parse it.
             // note: since the response comes wiht "content-type: text/html" it json parser will fail to parse it
-            var response = await restClient.ExecuteAsync(req);
+            var response = await powerlineClient.ExecuteAsync(req);
             // use system json serializer
             var instance = JsonSerializer.Deserialize<TpLinkResponse<List<SystemLog>>>(response.Content, jsonOption);
             return instance ?? new TpLinkResponse<List<SystemLog>>();
@@ -114,7 +120,7 @@ namespace TpLink.Api
             // use system json serializer
             // IMPORTANT: TP-LINK SERVER DOESN'T RETURN THE CORRECT CONTENT TYPE WHICH
             // MAKE THE JSONSERIALIZER TO USE THE XML BY DEFAULT
-            IRestResponse response = await restClient.ExecuteAsync(wirelessClientReq);
+            IRestResponse response = await powerlineClient.ExecuteAsync(wirelessClientReq);
 
             // faulty response
             //var doc = JsonDocument.Parse(response.Content, new JsonDocumentOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
@@ -129,12 +135,11 @@ namespace TpLink.Api
         /// <summary>
         /// Get powerline status, including transfer and received data rate
         /// </summary>
-        public async Task<TpLinkResponse<PowerlineDevices>> GetPowerlineDevicesStatusAsync()
+        public async Task<TpLinkResponse<IList<Device>>> GetPowerlineDevicesStatusAsync()
         {
             var powerLineStatusRequest = new RestRequest("admin/powerline", Method.POST)
             {
                 RequestFormat = DataFormat.None,
-
                 // deprecated
                 //Parameters =
                 //{
@@ -149,8 +154,12 @@ namespace TpLink.Api
             // IMPORTANT: TP-LINK SERVER RETURNS WRONG CONTENT TYPE (TEXT/HTML) WHICH INVOKES XML SERIALIZER BY DEFAULT
             //var response = await restClient.ExecuteAsync<TpLinkData<SystemLog>>(powerLineStatusRequest);
 
-            var response = await restClient.ExecuteAsync(powerLineStatusRequest);
-            return JsonSerializer.Deserialize<TpLinkResponse<PowerlineDevices>>(response.Content, jsonOption);
+            var response = await powerlineClient.ExecuteAsync(powerLineStatusRequest);
+            if (response.StatusCode != HttpStatusCode.OK)
+            {
+                return default;
+            }
+            return JsonSerializer.Deserialize<TpLinkResponse<IList<Device>>>(response.Content, jsonOption);
         }
 
         /// <summary>
@@ -167,7 +176,7 @@ namespace TpLink.Api
             var req = new RestRequest("admin/wireless", Method.POST);
             req.AddQueryParameter("form", "wireless_2g");
             req.AddParameter("operation", "read", ParameterType.GetOrPost);
-            var res = await restClient.ExecuteAsync(req);
+            var res = await powerlineClient.ExecuteAsync(req);
 
             // NOTE: THIS SEEMS TO BE POSSIBLE WITH NETWORNSOFT JSON JProperty
             var jdoc = JsonDocument.Parse(res.Content);
@@ -247,7 +256,7 @@ namespace TpLink.Api
             // TODO: CONVERT THE CASING TO "name_name", before sendin the post request
             // invoke some type os method to return parameter with corret casing
 
-            var res = await restClient.ExecuteAsync(req);
+            var res = await powerlineClient.ExecuteAsync(req);
             return null;
         }
 
@@ -268,7 +277,7 @@ namespace TpLink.Api
             req.AddParameter("htmode", "80", ParameterType.GetOrPost);
             req.AddParameter("channel", "auto", ParameterType.GetOrPost);
             req.AddParameter("txpower", "low", ParameterType.GetOrPost);
-            var res = await restClient.ExecuteAsync(req);
+            var res = await powerlineClient.ExecuteAsync(req);
             return JsonSerializer.Deserialize<TpLinkResponse<WirelessModel>>(res.Content, jsonOption);
         }
 
@@ -285,7 +294,7 @@ namespace TpLink.Api
             //req.AddParameter("operation", "read");
 
             // TODO: NOT WORKING, BUT THE REQUEST LOOKS THE SAME AS FROM CHROME BROWSER!
-            var res = await restClient.ExecuteAsync(req);
+            var res = await powerlineClient.ExecuteAsync(req);
             var data = JsonSerializer.Deserialize<TpLinkResponse<WifiMove>>(res.Content, jsonOption);
             return data;
         }
@@ -295,17 +304,101 @@ namespace TpLink.Api
             var req = new RestRequest("/admin/reboot.json", Method.POST)
             {
                 RequestFormat = DataFormat.None,
-                Parameters =
-                {
-                    new Parameter("operation", "write", ParameterType.GetOrPost),
-                }
             };
+            req.AddParameter("operation", "write", ParameterType.GetOrPost);
 
-            var response = await restClient.ExecuteAsync(req);
+            _ = await powerlineClient.ExecuteAsync(req);
             return await Task.FromResult(new TpLinkResponse<bool> { Data = true });
         }
 
-        // action method
-        // turn off the wifi (2.4g and 5g)
+        public async Task<TpLinkResponse<Guest2G>> GetGuest2GhzAsync()
+        {
+            var req = new RestRequest("/admin/guest?form=guest_2g", Method.POST);
+            req.Timeout = System.Convert.ToInt32(TimeSpan.FromSeconds(3).TotalMilliseconds);
+            req.AddQueryParameter("form", "guest_2g");
+            req.AddParameter("operation", "read");
+            var res = await powerlineClient.ExecuteAsync(req);
+
+            if (res.StatusCode == System.Net.HttpStatusCode.RequestTimeout)
+            {
+                // isable in router
+            }
+            return JsonSerializer.Deserialize<TpLinkResponse<Guest2G>>(res.Content, jsonOption);
+        }
+
+        public async Task<TpLinkResponse<Guest5G>> GetGuest5GhzAsync()
+        {
+            var req = new RestRequest("/admin/guest?form=guest_5g", Method.POST);
+            req.AddQueryParameter("form", "guest_5g");
+            req.AddParameter("operation", "read");
+            var res = await powerlineClient.ExecuteAsync(req);
+            return JsonSerializer.Deserialize<TpLinkResponse<Guest5G>>(res.Content, jsonOption);
+        }
+
+        /// <summary>
+        /// Find out which ip address is signed to the powerline.
+        /// </summary>
+        /// <returns></returns>
+        public static async Task<string> DiscoveryAsync()
+        {
+            // note here 192.168.1.86 was the ip that powerline was using - this is dynamic can change
+            // wireshark filter: (ip.dst == 192.168.1.108 && ip.src == 192.168.1.86 ) || (ip.dst == 255.255.255.255) 
+            using var uc = new UdpClient(61000)
+            {
+                EnableBroadcast = true,
+            };
+
+            //uc.Client.Bind(new IPEndPoint(IPAddress.Any, 61000));
+
+            // original data capture in wireshark
+            var data = new byte[] { 0x02, 0x03, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0xe8, 0x03, 0x12, 0x00, 0x75, 0x7c, 0xbe, 0x42, 0xdc, 0x81,
+                0x21, 0xf6, 0xe1, 0x5e, 0xff, 0xc0, 0xc4, 0x1e, 0x25, 0x96 };
+
+            // this is used to sed if only the buffer above should workd!
+            // WORKED!
+            var buffer = Encoding.UTF8.GetBytes("Where are you!");
+
+            // note: i think this is not really safe, because if powerline was fast enough the receive won't be able to capture
+            // see: https://stackoverflow.com/a/40617102/2766753 for more relaiable udp implementation
+            var count = await uc.SendAsync(buffer, buffer.Length, IPAddress.Broadcast.ToString(), 1040).ConfigureAwait(false);
+            UdpReceiveResult udpResponse = await uc.ReceiveAsync().ConfigureAwait(false);
+
+            // get the discovered ip addres of the powerline
+            return udpResponse.RemoteEndPoint.Address.ToString();
+        }
+
+        // note: copied code from my networking->UDPTesting project example
+        //public static IPAddress GetIpAddress()
+        //{
+        //    const NetworkInterfaceType interfaceType = true
+        //        ? NetworkInterfaceType.Wireless80211
+        //        : NetworkInterfaceType.Ethernet; /*| NetworkInterfaceType.FastEthernetFx |
+        //          NetworkInterfaceType.GigabitEthernet;*/ // "|" won't work because the type doesn't use [Flag] attribuite
+
+
+        //    IPAddress found = default;
+
+        //    // NOTE: ALWAYS SPECIFY THE INTERFACE IF THERE IS MORE THAN ON CONNECTION (LAN-WIFI)
+        //    foreach (var @interface in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
+        //    {
+        //        Console.WriteLine(@interface.Name);
+        //        if (@interface.NetworkInterfaceType == interfaceType)
+        //        {
+        //            // could be ipv4 / ipv6
+        //            var address = @interface.GetIPProperties().UnicastAddresses
+        //                .First(ip => ip.Address.AddressFamily == AddressFamily.InterNetwork).Address;
+        //            // note: if you are using virtual box this could be it's address so make sure more
+        //            // filter is done...
+        //            Console.WriteLine(address.ToString());
+        //            found = address;
+        //        }
+        //    }
+
+        //    var ipAddress = Dns.GetHostEntry(Dns.GetHostName()).AddressList[2];
+        //    Console.WriteLine(ipAddress);
+        //    return ipAddress;
+        //}
     }
+
 }

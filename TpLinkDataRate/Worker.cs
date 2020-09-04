@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TpLink.Api;
@@ -20,7 +21,7 @@ namespace TpLinkDataRate
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
+            //_logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
             while (!stoppingToken.IsCancellationRequested)
             {
                 // the default jsonserializer (newtownsoft) is faillign to handle tplink direclty
@@ -35,29 +36,29 @@ namespace TpLinkDataRate
                 //var data = System.Text.Json.JsonSerializer.Deserialize<TpLinkClientData>(response.Content, jsonOptions);
                 //_logger.LogInformation(data.Datas.Last().ToString());
 
-                var result = await _tpLinkClient.ChangeWireless5GStatusAsync(false);
-
-
-                var res = await _tpLinkClient.GetClientsAsync();
-
-                // note: if exception, close the web-page on browse and make sure wi-fi is one and at least one device is connected to powerline
-                foreach (var client in res?.Data)
-                {
-                    Console.WriteLine(client.DeviceName);
-                }
-
-                Console.WriteLine("done");
-                Console.ReadLine();
-
                 // test wifi-move
                 //var res2 = await _tpLinkClient.WifiMoveAsync(true);
 
 
+                // turn off radios for 5ghz network
+
+                var response = await _tpLinkClient.GetPowerlineDevicesStatusAsync();
+                if (response.Success)
+                {
+                    Console.WriteLine($"password: {response.Data.First().Password}");
+                    Console.WriteLine("operation success");
+                }
+                else
+                {
+                    Console.WriteLine();
+                    Console.WriteLine("operation failed (make sure you don't have powerline openned in browser)");
+                }
+
+                Console.WriteLine("done ");
+                Console.ReadLine();
                 // test reboot
                 // note: the turn off is scheduled, powerline won't turn the wi-fi one by default
-                await _tpLinkClient.RebootAsync();
-
-                Console.ReadLine();
+                //await _tpLinkClient.RebootAsync();
 
                 // test system log
                 //_logger.LogInformation(result.Data.FirstOrDefault().DeviceName);
@@ -66,8 +67,9 @@ namespace TpLinkDataRate
                 //{
                 //    Console.WriteLine(item.ToString());
                 //}
-                //await Task.Delay(1000 * 10, stoppingToken);
-                //Console.Clear();
+
+                await Task.Delay(1000 * 10, stoppingToken);
+                Console.Clear();
             }
         }
 
