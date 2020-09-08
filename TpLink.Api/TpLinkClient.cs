@@ -90,7 +90,7 @@ namespace TpLink.Api
 
             // rest thee response from the http response and try to parse it.
             // note: since the response comes wiht "content-type: text/html" it json parser will fail to parse it
-            var response = await powerlineClient.ExecuteAsync(req);
+            var response = await powerlineClient.ExecuteAsync(req).ConfigureAwait(false);
             // use system json serializer
             var instance = JsonSerializer.Deserialize<TpLinkResponse<List<SystemLog>>>(response.Content, jsonOption);
             return instance ?? new TpLinkResponse<List<SystemLog>>();
@@ -117,7 +117,7 @@ namespace TpLink.Api
             // use system json serializer
             // IMPORTANT: TP-LINK SERVER DOESN'T RETURN THE CORRECT CONTENT TYPE WHICH
             // MAKE THE JSONSERIALIZER TO USE THE XML BY DEFAULT
-            IRestResponse response = await powerlineClient.ExecuteAsync(wirelessClientReq);
+            IRestResponse response = await powerlineClient.ExecuteAsync(wirelessClientReq).ConfigureAwait(false);
 
             // faulty response
             //var doc = JsonDocument.Parse(response.Content, new JsonDocumentOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
@@ -151,7 +151,7 @@ namespace TpLink.Api
             // IMPORTANT: TP-LINK SERVER RETURNS WRONG CONTENT TYPE (TEXT/HTML) WHICH INVOKES XML SERIALIZER BY DEFAULT
             //var response = await restClient.ExecuteAsync<TpLinkData<SystemLog>>(powerLineStatusRequest);
 
-            var response = await powerlineClient.ExecuteAsync(powerLineStatusRequest);
+            var response = await powerlineClient.ExecuteAsync(powerLineStatusRequest).ConfigureAwait(false);
             if (response.StatusCode != HttpStatusCode.OK)
             {
                 return default;
@@ -173,7 +173,7 @@ namespace TpLink.Api
             var req = new RestRequest("admin/wireless", Method.POST);
             req.AddQueryParameter("form", "wireless_2g");
             req.AddParameter("operation", "read", ParameterType.GetOrPost);
-            var res = await powerlineClient.ExecuteAsync(req);
+            var res = await powerlineClient.ExecuteAsync(req).ConfigureAwait(false);
 
             //var jsonObj = new
             //{
@@ -263,7 +263,7 @@ namespace TpLink.Api
             // TODO: CONVERT THE CASING TO "name_name", before sendin the post request
             // invoke some type os method to return parameter with corret casing
 
-            var res = await powerlineClient.ExecuteAsync(req);
+            var res = await powerlineClient.ExecuteAsync(req).ConfigureAwait(false);
             return null;
         }
 
@@ -332,7 +332,7 @@ namespace TpLink.Api
             //req.AddParameter("operation", "read");
 
             // TODO: NOT WORKING, BUT THE REQUEST LOOKS THE SAME AS FROM CHROME BROWSER!
-            var res = await powerlineClient.ExecuteAsync(req);
+            var res = await powerlineClient.ExecuteAsync(req).ConfigureAwait(false);
             var data = JsonSerializer.Deserialize<TpLinkResponse<WifiMove>>(res.Content, jsonOption);
             return data;
         }
@@ -371,7 +371,7 @@ namespace TpLink.Api
             var req = new RestRequest("/admin/guest?form=guest_5g", Method.POST);
             req.AddQueryParameter("form", "guest_5g");
             req.AddParameter("operation", "read");
-            var res = await powerlineClient.ExecuteAsync(req);
+            var res = await powerlineClient.ExecuteAsync(req).ConfigureAwait(false);
 
             var jdoc = JsonDocument.Parse(res.Content, new JsonDocumentOptions
             {
