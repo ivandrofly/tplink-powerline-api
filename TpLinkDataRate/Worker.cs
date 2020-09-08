@@ -42,6 +42,8 @@ namespace TpLinkDataRate
 
                 // turn off radios for 5ghz network
 
+                var res = await _tpLinkClient.ChangeWireless5GStatusAsync(false);
+
                 var response = await _tpLinkClient.GetPowerlineDevicesStatusAsync();
                 if (response.Success)
                 {

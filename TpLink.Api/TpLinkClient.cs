@@ -1,11 +1,8 @@
-﻿using Newtonsoft.Json.Linq;
-using RestSharp;
+﻿using RestSharp;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Net;
-using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
@@ -178,15 +175,25 @@ namespace TpLink.Api
             req.AddParameter("operation", "read", ParameterType.GetOrPost);
             var res = await powerlineClient.ExecuteAsync(req);
 
+            //var jsonObj = new
+            //{
+            //    name = "ivandro",
+            //    age = 102,
+            //    order = new object[]
+            //    {
+
+            //    }
+            //};
+
             // NOTE: THIS SEEMS TO BE POSSIBLE WITH NETWORNSOFT JSON JProperty
-            var jdoc = JsonDocument.Parse(res.Content);
+            //var jdoc = JsonDocument.Parse(res.Content);
 
             //var jdoc = JObject.Parse(res.Content);
             //var r = jdoc.SelectToken("data");
 
             //jdoc.Root.
 
-            var jp = jdoc.RootElement.GetProperty("data");
+            //var jp = jdoc.RootElement.GetProperty("data");
 
             //req.AddJsonBody(new { name = new { data = ""} });
 
@@ -262,22 +269,53 @@ namespace TpLink.Api
 
         public async Task<TpLinkResponse<WirelessModel>> ChangeWireless5GStatusAsync(bool enabled)
         {
+            // send request to retrive the currnet wifi password
+            var reqStatus = new RestRequest("admin/wlan_status", Method.POST);
+            reqStatus.AddParameter("operation", "read", ParameterType.GetOrPost);
+            IRestResponse resStatus = await powerlineClient.ExecuteAsync(reqStatus).ConfigureAwait(false);
+
+            // operation failed
+            if (resStatus.IsSuccessful == false)
+            {
+                return null;
+            }
+
+            var jdoc = JsonDocument.Parse(resStatus.Content, new JsonDocumentOptions
+            {
+                AllowTrailingCommas = true,
+                CommentHandling = JsonCommentHandling.Skip,
+            });
+
+            // get pre-shared key for 5ghz network
+            string pskKey = jdoc.RootElement
+                .GetProperty("data")
+                .GetProperty("wireless_5g_pwd").GetString();
+
+            string ssid5ghz = jdoc.RootElement
+                .GetProperty("data")
+                .GetProperty("wireless_5g_ssid").GetString();
+
+            string encryption = jdoc.RootElement
+                .GetProperty("data")
+                .GetProperty("wireless_5g_encryption").GetString();
+
+            // build request to update 5ghz wireless
             var req = new RestRequest("admin/wireless", Method.POST);
             req.AddQueryParameter("form", "wireless_5g");
-
             req.AddParameter("operation", "write", ParameterType.GetOrPost);
             req.AddParameter("enable", enabled ? "on" : "off", ParameterType.GetOrPost);
-            req.AddParameter("ssid", "TP-LINK_2BDA_5G", ParameterType.GetOrPost);
+            req.AddParameter("ssid", ssid5ghz, ParameterType.GetOrPost);
             req.AddParameter("hidden", "off", ParameterType.GetOrPost);
-            req.AddParameter("psk_key", "93608305", ParameterType.GetOrPost);
-            req.AddParameter("encryption", "psk", ParameterType.GetOrPost);
+            req.AddParameter("psk_key", pskKey, ParameterType.GetOrPost);
+            req.AddParameter("encryption", encryption, ParameterType.GetOrPost);
             req.AddParameter("psk_version", "auto", ParameterType.GetOrPost);
             req.AddParameter("psk_cipher", "auto", ParameterType.GetOrPost);
             req.AddParameter("hwmode", "a", ParameterType.GetOrPost);
             req.AddParameter("htmode", "80", ParameterType.GetOrPost);
             req.AddParameter("channel", "auto", ParameterType.GetOrPost);
             req.AddParameter("txpower", "low", ParameterType.GetOrPost);
-            var res = await powerlineClient.ExecuteAsync(req);
+
+            IRestResponse res = await powerlineClient.ExecuteAsync(req).ConfigureAwait(false);
             return JsonSerializer.Deserialize<TpLinkResponse<WirelessModel>>(res.Content, jsonOption);
         }
 
@@ -307,19 +345,21 @@ namespace TpLink.Api
             };
             req.AddParameter("operation", "write", ParameterType.GetOrPost);
 
-            _ = await powerlineClient.ExecuteAsync(req);
+            _ = await powerlineClient.ExecuteAsync(req).ConfigureAwait(false);
             return await Task.FromResult(new TpLinkResponse<bool> { Data = true });
         }
 
         public async Task<TpLinkResponse<Guest2G>> GetGuest2GhzAsync()
         {
-            var req = new RestRequest("/admin/guest?form=guest_2g", Method.POST);
-            req.Timeout = System.Convert.ToInt32(TimeSpan.FromSeconds(3).TotalMilliseconds);
+            var req = new RestRequest("/admin/guest?form=guest_2g", Method.POST)
+            {
+                Timeout = Convert.ToInt32(TimeSpan.FromSeconds(3).TotalMilliseconds)
+            };
             req.AddQueryParameter("form", "guest_2g");
             req.AddParameter("operation", "read");
-            var res = await powerlineClient.ExecuteAsync(req);
+            var res = await powerlineClient.ExecuteAsync(req).ConfigureAwait(false);
 
-            if (res.StatusCode == System.Net.HttpStatusCode.RequestTimeout)
+            if (res.StatusCode == HttpStatusCode.RequestTimeout)
             {
                 // isable in router
             }
@@ -332,6 +372,13 @@ namespace TpLink.Api
             req.AddQueryParameter("form", "guest_5g");
             req.AddParameter("operation", "read");
             var res = await powerlineClient.ExecuteAsync(req);
+
+            var jdoc = JsonDocument.Parse(res.Content, new JsonDocumentOptions
+            {
+                AllowTrailingCommas = true,
+                CommentHandling = JsonCommentHandling.Skip
+            });
+
             return JsonSerializer.Deserialize<TpLinkResponse<Guest5G>>(res.Content, jsonOption);
         }
 
@@ -343,7 +390,7 @@ namespace TpLink.Api
         {
             // note here 192.168.1.86 was the ip that powerline was using - this is dynamic can change
             // wireshark filter: (ip.dst == 192.168.1.108 && ip.src == 192.168.1.86 ) || (ip.dst == 255.255.255.255) 
-            using var uc = new UdpClient(61000)
+            using var uc = new UdpClient(new IPEndPoint(IPAddress.Any, 61000))
             {
                 EnableBroadcast = true,
             };
@@ -366,6 +413,11 @@ namespace TpLink.Api
 
             // get the discovered ip addres of the powerline
             return udpResponse.RemoteEndPoint.Address.ToString();
+        }
+
+        public Task<object> AddNewUserAsynd()
+        {
+            throw new NotImplementedException();
         }
 
         // note: copied code from my networking->UDPTesting project example
