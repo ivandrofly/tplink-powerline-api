@@ -4,6 +4,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml;
 using TpLink.Api;
 
 namespace TpLinkDataRate
@@ -42,7 +43,7 @@ namespace TpLinkDataRate
 
                 // turn off radios for 5ghz network
 
-                var res = await _tpLinkClient.ChangeWireless5GStatusAsync(false);
+                var res = await _tpLinkClient.ChangeWireless5GStatusAsync(true);
 
                 var response = await _tpLinkClient.GetPowerlineDevicesStatusAsync();
                 if (response.Success)
@@ -57,7 +58,6 @@ namespace TpLinkDataRate
                 }
 
                 Console.WriteLine("done ");
-                Console.ReadLine();
                 // test reboot
                 // note: the turn off is scheduled, powerline won't turn the wi-fi one by default
                 //await _tpLinkClient.RebootAsync();
@@ -70,8 +70,9 @@ namespace TpLinkDataRate
                 //    Console.WriteLine(item.ToString());
                 //}
 
-                await Task.Delay(1000 * 10, stoppingToken);
+                await Task.Delay(1000 * 5, stoppingToken);
                 Console.Clear();
+                break;
             }
         }
 

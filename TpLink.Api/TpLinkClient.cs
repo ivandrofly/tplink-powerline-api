@@ -168,6 +168,7 @@ namespace TpLink.Api
             return clients.Data.Count;
         }
 
+        // TODO: remove - use same logic as 5ghz one
         public async Task<TpLinkResponse<WirelessModel>> GetWirelessBand2GAsync()
         {
             var req = new RestRequest("admin/wireless", Method.POST);
@@ -260,7 +261,7 @@ namespace TpLink.Api
             // add by one and convert the prop-name?
             // build a method to handle it all?
 
-            // TODO: CONVERT THE CASING TO "name_name", before sendin the post request
+            // TODO: CONVERT THE CASING TO "name_name", before sending the post request
             // invoke some type os method to return parameter with corret casing
 
             var res = await powerlineClient.ExecuteAsync(req).ConfigureAwait(false);
@@ -333,8 +334,7 @@ namespace TpLink.Api
 
             // TODO: NOT WORKING, BUT THE REQUEST LOOKS THE SAME AS FROM CHROME BROWSER!
             var res = await powerlineClient.ExecuteAsync(req).ConfigureAwait(false);
-            var data = JsonSerializer.Deserialize<TpLinkResponse<WifiMove>>(res.Content, jsonOption);
-            return data;
+            return JsonSerializer.Deserialize<TpLinkResponse<WifiMove>>(res.Content, jsonOption);
         }
 
         public async Task<TpLinkResponse<bool>> RebootAsync()

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Text;
 
 namespace TpLink.Api.Helpers
@@ -10,9 +9,8 @@ namespace TpLink.Api.Helpers
         {
             using var md5 = System.Security.Cryptography.MD5.Create();
             var hashBuffer = md5.ComputeHash(Encoding.UTF8.GetBytes(password));
-            //string hashedPwd = Encoding.UTF8.GetString));
+            //  A string of hexadecimal pairs separated by hyphens, where each pair represents the corresponding element in value; for example, "7F-2C-4A-00"
             return BitConverter.ToString(hashBuffer).Replace("-", string.Empty).ToLowerInvariant();
-            // encoding.utf8.getstirng vs bitconvert.tostring
         }
         
         //System.Net.WebUtility.HtmlEncode()
