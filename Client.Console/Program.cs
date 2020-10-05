@@ -45,5 +45,5 @@ var wifiSchedule = new WifiSchedule
 };
 
 // TODO: TEST!
-bool response = await client.AddNewWifiSchedule(wifiSchedule).ConfigureAwait(false);
+bool response = await client.AddNewWifiScheduleAsync(wifiSchedule).ConfigureAwait(false);
 Console.WriteLine(response);

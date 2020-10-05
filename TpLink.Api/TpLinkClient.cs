@@ -423,12 +423,12 @@ namespace TpLink.Api
             return udpResponse.RemoteEndPoint.Address.ToString();
         }
 
-        public Task<object> AddNewUserAsynd()
+        public Task<object> AddNewUserAsync()
         {
             throw new NotImplementedException();
         }
 
-        public async Task<bool> AddNewWifiSchedule(WifiSchedule wifiSchedule)
+        public async Task<bool> AddNewWifiScheduleAsync(WifiSchedule wifiSchedule)
         {
             // validation
             if (wifiSchedule.StartTime < 0 || wifiSchedule.StartTime > 24)
