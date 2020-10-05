@@ -1,6 +1,7 @@
 ﻿using RestSharp;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -17,23 +18,23 @@ namespace TpLink.Api
 {
     public class TpLinkClient : ITpLinkClient
     {
-        private readonly RestClient _connection;
+        private readonly RestClient _apiConnection; // name "connection" doesn't handle the validation
         private readonly JsonSerializerOptions jsonOption;
 
-        public ApiConnection ApiConnection { get; }
+        public EndpointAuth EndpointAuth { get; }
 
         public TpLinkClient() : this("admin", "admin", "192.168.1.1")
         {
         }
 
         public TpLinkClient(string login, string password, string endpoint)
-            : this(new ApiConnection(login, password, endpoint))
+            : this(new EndpointAuth(login, password, endpoint))
         {
         }
 
-        public TpLinkClient(ApiConnection apiConnection)
+        public TpLinkClient(EndpointAuth apiConnection)
         {
-            _connection = new RestClient(apiConnection.Endpoint)
+            _apiConnection = new RestClient(apiConnection.Endpoint)
             {
                 // NOTE: Whne the version of the user agent change, this may need to be changed aswell
                 // the entire request may be okay, but when the user agent's version changed, this may need to be updated aswell
@@ -73,7 +74,7 @@ namespace TpLink.Api
                 // note: wont work when sending the request, since the request ain't sent as json! :(
                 //PropertyNamingPolicy = new TpLinkPropertyNamingPolicy(),
             };
-            ApiConnection = apiConnection;
+            EndpointAuth = apiConnection;
 
             // Ignore for now! tplink server returns wron'g content-type
             //restClient.UseSystemTextJson(_option);
@@ -97,7 +98,7 @@ namespace TpLink.Api
 
             // rest thee response from the http response and try to parse it.
             // note: since the response comes wiht "content-type: text/html" it json parser will fail to parse it
-            var response = await _connection.ExecuteAsync(req).ConfigureAwait(false);
+            var response = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
             // use system json serializer
             var instance = JsonSerializer.Deserialize<TpLinkResponse<List<SystemLog>>>(response.Content, jsonOption);
             return instance ?? new TpLinkResponse<List<SystemLog>>();
@@ -109,7 +110,7 @@ namespace TpLink.Api
         //public async Task<TpLinkClientData> GetClientsAsync()
         public async Task<TpLinkClientData> GetClientsAsync()
         {
-            var wirelessClientReq = new RestRequest("admin/wireless", Method.POST)
+            var plWirelessClientReq = new RestRequest("admin/wireless", Method.POST)
             {
                 RequestFormat = DataFormat.None,
                 Parameters =
@@ -124,7 +125,7 @@ namespace TpLink.Api
             // use system json serializer
             // IMPORTANT: TP-LINK SERVER DOESN'T RETURN THE CORRECT CONTENT TYPE WHICH
             // MAKE THE JSONSERIALIZER TO USE THE XML BY DEFAULT
-            IRestResponse response = await _connection.ExecuteAsync(wirelessClientReq).ConfigureAwait(false);
+            IRestResponse response = await _apiConnection.ExecuteAsync(plWirelessClientReq).ConfigureAwait(false);
 
             // faulty response
             //var doc = JsonDocument.Parse(response.Content, new JsonDocumentOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
@@ -141,7 +142,7 @@ namespace TpLink.Api
         /// </summary>
         public async Task<TpLinkResponse<IList<Device>>> GetPowerlineDevicesStatusAsync()
         {
-            var powerLineStatusRequest = new RestRequest("admin/powerline", Method.POST)
+            var plStatusReq = new RestRequest("admin/powerline", Method.POST)
             {
                 RequestFormat = DataFormat.None,
                 // deprecated
@@ -152,13 +153,13 @@ namespace TpLink.Api
                 //}
             };
 
-            powerLineStatusRequest.AddQueryParameter("form", "plc_device");
-            powerLineStatusRequest.AddParameter("operation", "load", ParameterType.GetOrPost);
+            plStatusReq.AddQueryParameter("form", "plc_device");
+            plStatusReq.AddParameter("operation", "load", ParameterType.GetOrPost);
 
             // IMPORTANT: TP-LINK SERVER RETURNS WRONG CONTENT TYPE (TEXT/HTML) WHICH INVOKES XML SERIALIZER BY DEFAULT
             //var response = await restClient.ExecuteAsync<TpLinkData<SystemLog>>(powerLineStatusRequest);
 
-            var response = await _connection.ExecuteAsync(powerLineStatusRequest).ConfigureAwait(false);
+            var response = await _apiConnection.ExecuteAsync(plStatusReq).ConfigureAwait(false);
             if (response.StatusCode != HttpStatusCode.OK)
             {
                 return default;
@@ -181,7 +182,7 @@ namespace TpLink.Api
             var req = new RestRequest("admin/wireless", Method.POST);
             req.AddQueryParameter("form", "wireless_2g");
             req.AddParameter("operation", "read", ParameterType.GetOrPost);
-            var res = await _connection.ExecuteAsync(req).ConfigureAwait(false);
+            var res = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
 
             //var jsonObj = new
             //{
@@ -271,7 +272,7 @@ namespace TpLink.Api
             // TODO: CONVERT THE CASING TO "name_name", before sending the post request
             // invoke some type os method to return parameter with corret casing
 
-            await _connection.ExecuteAsync(req).ConfigureAwait(false);
+            await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
             return null;
         }
 
@@ -280,7 +281,7 @@ namespace TpLink.Api
             // send request to retrive the currnet wifi password
             var reqStatus = new RestRequest("admin/wlan_status", Method.POST);
             reqStatus.AddParameter("operation", "read", ParameterType.GetOrPost);
-            IRestResponse resStatus = await _connection.ExecuteAsync(reqStatus).ConfigureAwait(false);
+            IRestResponse resStatus = await _apiConnection.ExecuteAsync(reqStatus).ConfigureAwait(false);
 
             // operation failed
             if (resStatus.IsSuccessful == false)
@@ -323,7 +324,7 @@ namespace TpLink.Api
             req.AddParameter("channel", "auto", ParameterType.GetOrPost);
             req.AddParameter("txpower", "low", ParameterType.GetOrPost);
 
-            IRestResponse res = await _connection.ExecuteAsync(req).ConfigureAwait(false);
+            IRestResponse res = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
             return JsonSerializer.Deserialize<TpLinkResponse<WirelessModel>>(res.Content, jsonOption);
         }
 
@@ -340,7 +341,7 @@ namespace TpLink.Api
             //req.AddParameter("operation", "read");
 
             // TODO: NOT WORKING, BUT THE REQUEST LOOKS THE SAME AS FROM CHROME BROWSER!
-            var res = await _connection.ExecuteAsync(req).ConfigureAwait(false);
+            var res = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
             return JsonSerializer.Deserialize<TpLinkResponse<WifiMove>>(res.Content, jsonOption);
         }
 
@@ -352,7 +353,7 @@ namespace TpLink.Api
             };
             req.AddParameter("operation", "write", ParameterType.GetOrPost);
 
-            _ = await _connection.ExecuteAsync(req).ConfigureAwait(false);
+            _ = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
             return await Task.FromResult(new TpLinkResponse<bool> { Data = true });
         }
 
@@ -364,7 +365,7 @@ namespace TpLink.Api
             };
             req.AddQueryParameter("form", "guest_2g");
             req.AddParameter("operation", "read");
-            var res = await _connection.ExecuteAsync(req).ConfigureAwait(false);
+            var res = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
 
             if (res.StatusCode == HttpStatusCode.RequestTimeout)
             {
@@ -378,7 +379,7 @@ namespace TpLink.Api
             var req = new RestRequest("/admin/guest?form=guest_5g", Method.POST);
             req.AddQueryParameter("form", "guest_5g");
             req.AddParameter("operation", "read");
-            var res = await _connection.ExecuteAsync(req).ConfigureAwait(false);
+            var res = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
 
             var jdoc = JsonDocument.Parse(res.Content, new JsonDocumentOptions
             {
@@ -425,6 +426,57 @@ namespace TpLink.Api
         public Task<object> AddNewUserAsynd()
         {
             throw new NotImplementedException();
+        }
+
+        public async Task<bool> AddNewWifiSchedule(WifiSchedule wifiSchedule)
+        {
+            // validation
+            if (wifiSchedule.StartTime < 0 || wifiSchedule.StartTime > 24)
+            {
+                throw new InvalidEnumArgumentException(nameof(WifiSchedule.StartTime));
+            }
+            if (wifiSchedule.EndTime < 0 || wifiSchedule.EndTime > 24)
+            {
+                throw new InvalidEnumArgumentException(nameof(WifiSchedule.EndTime));
+            }
+            if (wifiSchedule.StartTime >= wifiSchedule.EndTime)
+            {
+                throw new InvalidEnumArgumentException(nameof(WifiSchedule.StartTime));
+            }
+
+            var jsonOptions = new JsonSerializerOptions
+            {
+                WriteIndented = false,
+                IgnoreNullValues = true,
+                AllowTrailingCommas = true,
+                PropertyNameCaseInsensitive = true,
+                //PropertyNamingPolicy = new PropertyNamingPolicy.TpLinkPropertyNamingPolicy
+            };
+
+            // JsonConverterFactory
+            // https://docs.microsoft.com/en-us/dotnet/standard/serialization/system-text-json-converters-how-to#support-dictionary-with-non-string-key
+
+            // https://docs.microsoft.com/en-us/dotnet/standard/serialization/system-text-json-converters-how-to#registration-sample---converters-collection
+            // jsonOptions.Converters.Add(new DateTimeOffsetConverter());
+
+            // displaying registered converters
+            foreach (var item in jsonOptions.Converters)
+            {
+                Console.WriteLine(item.ToString());
+            }
+
+            var req = new RestRequest("/admin/wlanTimeControl", Method.POST);
+            req.AddParameter("operation", "insert");
+            req.AddParameter("key", "add");
+            // todo: how the index should be processed
+            req.AddParameter("index", "0"); // i think the index should be get from sorting all the pre existing rules and insert acoording to "from" time
+            req.AddParameter("old", "add");
+            req.AddParameter("new", JsonSerializer.Serialize(wifiSchedule, jsonOptions));
+
+            var response = await _apiConnection.ExecuteAsync(req);
+
+            // note: there cannot be a overlaps with the already existing schedule
+            return response.StatusCode == HttpStatusCode.OK;
         }
 
         // note: copied code from my networking->UDPTesting project example

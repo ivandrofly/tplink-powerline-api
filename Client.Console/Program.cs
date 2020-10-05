@@ -1,7 +1,6 @@
 ﻿using System;
-using System.Threading.Tasks;
 using TpLink.Api;
-
+using TpLink.Api.Models;
 
 Console.WriteLine("sending the discovery request...");
 string endpoint = await TpLinkClient.DiscoveryAsync();
@@ -17,7 +16,6 @@ string password = Environment.GetEnvironmentVariable("tplink_powerline_pwd", Env
 #pragma warning disable CS0612 // Type or member is obsolete
 var client = new TpLink.Api.TpLinkClient(login, password, $"http://{endpoint}");
 #pragma warning restore CS0612 // Type or member is obsolete
-
 
 //Console.WriteLine("rebooting...");
 //await client.RebootAsync();
@@ -37,4 +35,15 @@ Console.WriteLine();
 //}
 
 
-Task.Delay(1000 * 10).GetAwaiter().GetResult();
+// to
+var wifiSchedule = new WifiSchedule
+{
+    Enable = true,
+    StartTime = 0,
+    EndTime = 1,
+    Days = Days.Monday | Days.Tuesday | Days.Wednesday | Days.Thursday | Days.Friday | Days.Saturday | Days.Sunday
+};
+
+// TODO: TEST!
+bool response = await client.AddNewWifiSchedule(wifiSchedule).ConfigureAwait(false);
+Console.WriteLine(response);

@@ -1,4 +1,3 @@
-using System;
 using TpLink.Api.Helpers;
 using Xunit;
 

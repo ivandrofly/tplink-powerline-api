@@ -38,9 +38,7 @@ namespace TpLinkDataRate
                 //_logger.LogInformation(data.Datas.Last().ToString());
 
                 // test wifi-move
-                //var res2 = await _tpLinkClient.WifiMoveAsync(true);
-
-
+                // var res2 = await _tpLinkClient.WifiMoveAsync(true);
                 // turn off radios for 5ghz network
 
                 var res = await _tpLinkClient.ChangeWireless5GStatusAsync(true);

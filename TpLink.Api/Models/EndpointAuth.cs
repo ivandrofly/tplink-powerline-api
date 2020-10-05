@@ -4,9 +4,9 @@ using System.Text;
 
 namespace TpLink.Api.Models
 {
-    public class ApiConnection
+    public class EndpointAuth
     {
-        public ApiConnection(string login, string passoword, string endpoint)
+        public EndpointAuth(string login, string passoword, string endpoint)
         {
             Login = login;
             Passoword = passoword;

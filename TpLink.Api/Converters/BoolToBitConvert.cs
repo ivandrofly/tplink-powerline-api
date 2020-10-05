@@ -4,10 +4,7 @@ using System.Text.Json.Serialization;
 
 namespace TpLink.Api.Converters
 {
-    /// <summary>
-    /// Writes string to boolean true=on and false=off
-    /// </summary>
-    public class StringBoolConverter : JsonConverter<bool>
+    public class BoolToBitConvert : JsonConverter<bool>
     {
         public override bool Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
@@ -15,18 +12,16 @@ namespace TpLink.Api.Converters
             {
                 return reader.GetBoolean();
             }
-            catch (InvalidOperationException)
+            catch (InvalidOperationException) // fail convertion
             {
                 string value = reader.GetString();
-                // expected values: on / off
-                return value.Equals("on", StringComparison.OrdinalIgnoreCase);
+                return Convert.ToBoolean(value.Equals("1", StringComparison.Ordinal) ? true : false);
             }
         }
 
         public override void Write(Utf8JsonWriter writer, bool value, JsonSerializerOptions options)
         {
-            //writer.WriteString("none", DateTime.Now);
-            writer.WriteStringValue(value ? "on" : "off");
+            writer.WriteStringValue(value ? "1" : "0");
         }
     }
 }

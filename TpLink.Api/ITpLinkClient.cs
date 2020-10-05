@@ -18,5 +18,6 @@ namespace TpLink.Api
         Task<TpLinkResponse<Guest2G>> GetGuest2GhzAsync();
         Task<TpLinkResponse<Guest5G>> GetGuest5GhzAsync();
         Task<object> AddNewUserAsynd();
+        Task<bool> AddNewWifiSchedule(WifiSchedule wifiSchedule);
     }
 }
