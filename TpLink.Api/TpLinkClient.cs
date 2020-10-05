@@ -468,7 +468,6 @@ namespace TpLink.Api
             var req = new RestRequest("/admin/wlanTimeControl", Method.POST);
             req.AddParameter("operation", "insert");
             req.AddParameter("key", "add");
-            // todo: how the index should be processed
             req.AddParameter("index", "0"); // i think the index should be get from sorting all the pre existing rules and insert acoording to "from" time
             req.AddParameter("old", "add");
             req.AddParameter("new", JsonSerializer.Serialize(wifiSchedule, jsonOptions));
