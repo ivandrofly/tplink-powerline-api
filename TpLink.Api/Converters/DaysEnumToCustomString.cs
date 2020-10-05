@@ -9,7 +9,7 @@ namespace TpLink.Api.Converters
     {
         public override Days Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            throw new NotImplementedException();
+            return (Days)Enum.Parse(typeof(Days), reader.GetString());
         }
 
         public override void Write(Utf8JsonWriter writer, Days value, JsonSerializerOptions options)
