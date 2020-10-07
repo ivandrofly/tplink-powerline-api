@@ -428,7 +428,7 @@ namespace TpLink.Api
             throw new NotImplementedException();
         }
 
-        public async Task<bool> AddNewWifiScheduleAsync(WifiSchedule wifiSchedule)
+        public async Task<TpLinkResponse<ICollection<WifiSchedule>>> AddNewWifiScheduleAsync(WifiSchedule wifiSchedule)
         {
             // validation
             if (wifiSchedule.StartTime < 0 || wifiSchedule.StartTime > 24)
@@ -475,7 +475,10 @@ namespace TpLink.Api
             var response = await _apiConnection.ExecuteAsync(req);
 
             // note: there cannot be a overlaps with the already existing schedule
-            return response.StatusCode == HttpStatusCode.OK;
+            //return response.StatusCode == HttpStatusCode.OK;
+
+            //todo: test
+            return await Task.FromResult(JsonSerializer.Deserialize<TpLinkResponse<ICollection<WifiSchedule>>>(response.Content));
         }
 
         // note: copied code from my networking->UDPTesting project example

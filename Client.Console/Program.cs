@@ -3,7 +3,10 @@ using TpLink.Api;
 using TpLink.Api.Models;
 
 Console.WriteLine("sending the discovery request...");
-string endpoint = await TpLinkClient.DiscoveryAsync();
+
+bool discover = false;
+
+string endpoint = discover ? await TpLinkClient.DiscoveryAsync() : "192.168.1.97";
 
 Console.WriteLine($"tp link address: {endpoint}");
 
@@ -44,6 +47,5 @@ var wifiSchedule = new WifiSchedule
     Days = Days.Monday | Days.Tuesday | Days.Wednesday | Days.Thursday | Days.Friday | Days.Saturday | Days.Sunday
 };
 
-// TODO: TEST!
-bool response = await client.AddNewWifiScheduleAsync(wifiSchedule).ConfigureAwait(false);
+var response = await client.AddNewWifiScheduleAsync(wifiSchedule).ConfigureAwait(false);
 Console.WriteLine(response);
