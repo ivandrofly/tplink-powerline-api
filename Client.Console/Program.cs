@@ -20,23 +20,13 @@ string password = Environment.GetEnvironmentVariable("tplink_powerline_pwd", Env
 var client = new TpLink.Api.TpLinkClient(login, password, $"http://{endpoint}");
 #pragma warning restore CS0612 // Type or member is obsolete
 
-//Console.WriteLine("rebooting...");
-//await client.RebootAsync();
-//Console.WriteLine("reboot done!");
-Console.WriteLine();
-foreach (var clientWireless in (await client.GetClientsAsync()).Data)
+
+//todo: bug here!!!
+var res = await client.GetSystemLogsAsync();
+foreach (TpLink.Models.SystemLog item in res.Data)
 {
-    Console.WriteLine(clientWireless.DeviceName);
+    Console.WriteLine(item.Content);
 }
-Console.WriteLine();
-
-// todo:  bug here!!!
-//var res = await client.GetSystemLogsAsync();
-//foreach (var item in res.Data)
-//{
-//    Console.WriteLine(item.Content);
-//}
-
 
 // to
 var wifiSchedule = new WifiSchedule

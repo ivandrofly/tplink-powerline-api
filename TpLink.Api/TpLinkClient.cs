@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
+using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -82,23 +83,13 @@ namespace TpLink.Api
         /// </summary>
         public async Task<TpLinkResponse<List<SystemLog>>> GetSystemLogsAsync()
         {
-            // build the system log
-            var req = new RestRequest("admin/syslog", Method.POST)
-            {
-                RequestFormat = DataFormat.None,
-                Parameters =
-                {
-                    new Parameter("form", "log", ParameterType.QueryString),
-                    new Parameter("operation", "load", ParameterType.GetOrPost),
-                }
-            };
+            var req = new RestRequest("admin/syslog", Method.POST);
+            req.AddParameter("form", "log", ParameterType.QueryString);
+            req.AddParameter("operation", "load", ParameterType.GetOrPost);
 
-            // rest thee response from the http response and try to parse it.
             // note: since the response comes wiht "content-type: text/html" it json parser will fail to parse it
             var response = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
-            // use system json serializer
-            var instance = JsonSerializer.Deserialize<TpLinkResponse<List<SystemLog>>>(response.Content, jsonOption);
-            return instance ?? new TpLinkResponse<List<SystemLog>>();
+            return JsonSerializer.Deserialize<TpLinkResponse<List<SystemLog>>>(response.Content, jsonOption) ?? new TpLinkResponse<List<SystemLog>>();
         }
 
         /// <summary>
@@ -390,7 +381,7 @@ namespace TpLink.Api
         /// <summary>
         /// Find out which ip address is signed to the powerline.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>The ip address of the powerline</returns>
         public static async Task<string> DiscoveryAsync()
         {
             // note here 192.168.1.86 was the ip that powerline was using - this is dynamic can change
