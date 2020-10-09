@@ -41,25 +41,20 @@ namespace TpLink.Api
                 // the entire request may be okay, but when the user agent's version changed, this may need to be updated aswell
                 // Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.163 Safari/537.36
                 // important: setting rule for user-agent in fiddler will override this, which can cause several complication
-                //UserAgent = @"TPlinkClient", // required
-                UserAgent = @"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.163 Safari/537.36", // required
-
-                DefaultParameters =
-                {
-                    new Parameter("Connection", "keep-alive", ParameterType.HttpHeader),
-                    new Parameter("Accept", "application/json, text/javascript, */*; q=0.01", ParameterType.HttpHeader),
-                    new Parameter("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8", ParameterType.HttpHeader),
-                    new Parameter("Accept-Encoding", "gzip,deflate", ParameterType.HttpHeader),
-                    new Parameter("Accept-Language", "en-US,en;q=0.9,pt-PT;q=0.8,pt;q=0.7", ParameterType.HttpHeader),
-                    new Parameter("Origin", apiConnection.Endpoint, ParameterType.HttpHeader),
-                    new Parameter("Referer", apiConnection.Endpoint, ParameterType.HttpHeader),
-                    new Parameter("X-Requested-With", "XMLHttpRequest", ParameterType.HttpHeader),
-                    new Parameter("Authorization", $"{StringUtils.GetAuthorization(apiConnection.Login, apiConnection.Passoword)}", ParameterType.Cookie),
-                    new Parameter("DNT", "1", ParameterType.HttpHeader),
-                },
-
+                UserAgent = @"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.163 Safari/537.36", // a must!
                 Timeout = (int)TimeSpan.FromSeconds(10).TotalMilliseconds
             };
+
+            _apiConnection.AddDefaultHeader("Cookie", $"Authorization={StringUtils.GetAuthorization(apiConnection.Login, apiConnection.Passoword)}");
+            _apiConnection.AddDefaultHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+            _apiConnection.AddDefaultHeader("Accept", "application/json, text/javascript, */*; q=0.01");
+            _apiConnection.AddDefaultHeader("Accept-Language", "en-US,en;q=0.9,pt-PT;q=0.8,pt;q=0.7");
+            _apiConnection.AddDefaultHeader("X-Requested-With", "XMLHttpRequest");
+            _apiConnection.AddDefaultHeader("Accept-Encoding", "gzip,deflate");
+            _apiConnection.AddDefaultHeader("Referer", apiConnection.Endpoint);
+            _apiConnection.AddDefaultHeader("Origin", apiConnection.Endpoint);
+            _apiConnection.AddDefaultHeader("Connection", "keep-alive");
+            _apiConnection.AddDefaultHeader("DNT", "1");
 
             // default option
             jsonOption = new JsonSerializerOptions
