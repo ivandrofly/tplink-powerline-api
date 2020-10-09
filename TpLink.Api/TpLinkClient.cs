@@ -53,9 +53,6 @@ namespace TpLink.Api
                     new Parameter("Origin", apiConnection.Endpoint, ParameterType.HttpHeader),
                     new Parameter("Referer", apiConnection.Endpoint, ParameterType.HttpHeader),
                     new Parameter("X-Requested-With", "XMLHttpRequest", ParameterType.HttpHeader),
-                    // todo: compute authorization
-                    // The 'Value'='Basic%20admin%3A656a351961b7552d9bb35a0201b6d6fd;path=/
-                    // new Parameter("Authorization", "Basic%20admin%3A656a351961b7552d9bb35a0201b6d6fd", ParameterType.Cookie),
                     new Parameter("Authorization", $"{StringUtils.GetAuthorization(apiConnection.Login, apiConnection.Passoword)}", ParameterType.Cookie),
                     new Parameter("DNT", "1", ParameterType.HttpHeader),
                 },
