@@ -19,5 +19,9 @@ namespace TpLink.Api
         Task<TpLinkResponse<Guest5G>> GetGuest5GhzAsync();
         Task<object> AddNewUserAsync();
         Task<TpLinkResponse<ICollection<WifiSchedule>>> AddNewWifiScheduleAsync(WifiSchedule wifiSchedule);
+        Task<MacFilterDevice> AddMacFilterAsync(MacFilterDevice macFilter);
+        Task<MacFilterDevice> RemoveMacFilterAsync(MacFilterDevice macFilter);
+        Task<bool> MacFilterChangeStateAsync(bool enabled);
+        Task<TpLinkResponse<ICollection<MacFilterDevice>>> MacFilterGetDeviceListAsync(bool enabled);
     }
 }

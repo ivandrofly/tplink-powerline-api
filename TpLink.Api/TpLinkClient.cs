@@ -457,6 +457,26 @@ namespace TpLink.Api
             return await Task.FromResult(JsonSerializer.Deserialize<TpLinkResponse<ICollection<WifiSchedule>>>(response.Content));
         }
 
+        public Task<MacFilterDevice> AddMacFilterAsync(MacFilterDevice macFilter)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<MacFilterDevice> RemoveMacFilterAsync(MacFilterDevice macFilter)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<bool> MacFilterChangeStateAsync(bool enabled)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<TpLinkResponse<ICollection<MacFilterDevice>>> MacFilterGetDeviceListAsync(bool enabled)
+        {
+            throw new NotImplementedException();
+        }
+
         // note: copied code from my networking->UDPTesting project example
         //public static IPAddress GetIpAddress()
         //{
