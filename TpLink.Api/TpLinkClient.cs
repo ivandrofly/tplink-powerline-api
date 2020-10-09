@@ -402,13 +402,11 @@ namespace TpLink.Api
 
             //uc.Client.Bind(new IPEndPoint(IPAddress.Any, 61000));
 
-            // original data capture in wireshark
+            // original data capture in wireshark (discover message in bytes)
             var data = new byte[] { 0x02, 0x03, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0xe8, 0x03, 0x12, 0x00, 0x75, 0x7c, 0xbe, 0x42, 0xdc, 0x81,
                 0x21, 0xf6, 0xe1, 0x5e, 0xff, 0xc0, 0xc4, 0x1e, 0x25, 0x96 };
 
-            // this is used to sed if only the buffer above should workd!
-            // WORKED!
             var buffer = Encoding.UTF8.GetBytes("Where are you!");
 
             // note: i think this is not really safe, because if powerline was fast enough the receive won't be able to capture
@@ -457,10 +455,10 @@ namespace TpLink.Api
             // jsonOptions.Converters.Add(new DateTimeOffsetConverter());
 
             // displaying registered converters
-            foreach (var item in jsonOptions.Converters)
-            {
-                Console.WriteLine(item.ToString());
-            }
+            // foreach (JsonConverter jc in jsonOptions.Converters)
+            // {
+            //     Console.WriteLine(jc.ToString());
+            // }
 
             var req = new RestRequest("/admin/wlanTimeControl", Method.POST);
             req.AddParameter("operation", "insert");
@@ -469,12 +467,8 @@ namespace TpLink.Api
             req.AddParameter("old", "add");
             req.AddParameter("new", JsonSerializer.Serialize(wifiSchedule, jsonOptions));
 
-            var response = await _apiConnection.ExecuteAsync(req);
+            IRestResponse response = await _apiConnection.ExecuteAsync(req);
 
-            // note: there cannot be a overlaps with the already existing schedule
-            //return response.StatusCode == HttpStatusCode.OK;
-
-            //todo: test
             return await Task.FromResult(JsonSerializer.Deserialize<TpLinkResponse<ICollection<WifiSchedule>>>(response.Content));
         }
 
@@ -485,7 +479,6 @@ namespace TpLink.Api
         //        ? NetworkInterfaceType.Wireless80211
         //        : NetworkInterfaceType.Ethernet; /*| NetworkInterfaceType.FastEthernetFx |
         //          NetworkInterfaceType.GigabitEthernet;*/ // "|" won't work because the type doesn't use [Flag] attribuite
-
 
         //    IPAddress found = default;
 
