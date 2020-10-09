@@ -6,7 +6,6 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
-using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -35,6 +34,8 @@ namespace TpLink.Api
 
         public TpLinkClient(EndpointAuth apiConnection)
         {
+            EndpointAuth = apiConnection ?? throw new ArgumentNullException(nameof(apiConnection));
+
             _apiConnection = new RestClient(apiConnection.Endpoint)
             {
                 // NOTE: Whne the version of the user agent change, this may need to be changed aswell
@@ -56,7 +57,7 @@ namespace TpLink.Api
             _apiConnection.AddDefaultHeader("Connection", "keep-alive");
             _apiConnection.AddDefaultHeader("DNT", "1");
 
-            // default option
+            // default serializer options
             jsonOption = new JsonSerializerOptions
             {
                 IgnoreNullValues = true,
@@ -67,8 +68,6 @@ namespace TpLink.Api
                 // note: wont work when sending the request, since the request ain't sent as json! :(
                 //PropertyNamingPolicy = new TpLinkPropertyNamingPolicy(),
             };
-            EndpointAuth = apiConnection;
-
             // Ignore for now! tplink server returns wron'g content-type
             //restClient.UseSystemTextJson(_option);
         }
