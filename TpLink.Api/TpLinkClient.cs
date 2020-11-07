@@ -467,12 +467,12 @@ namespace TpLink.Api
             throw new NotImplementedException();
         }
 
-        public Task<bool> MacFilterChangeStateAsync(bool enabled)
+        public Task<bool> ChangeMacFilterStateAsync(bool enabled)
         {
             throw new NotImplementedException();
         }
 
-        public Task<TpLinkResponse<ICollection<MacFilterDevice>>> MacFilterGetDeviceListAsync(bool enabled)
+        public Task<TpLinkResponse<ICollection<MacFilterDevice>>> GetMacFilterGetDevicesAsync(bool enabled)
         {
             throw new NotImplementedException();
         }

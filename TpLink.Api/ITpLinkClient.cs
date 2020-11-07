@@ -21,7 +21,7 @@ namespace TpLink.Api
         Task<TpLinkResponse<ICollection<WifiSchedule>>> AddNewWifiScheduleAsync(WifiSchedule wifiSchedule);
         Task<MacFilterDevice> AddMacFilterAsync(MacFilterDevice macFilter);
         Task<MacFilterDevice> RemoveMacFilterAsync(MacFilterDevice macFilter);
-        Task<bool> MacFilterChangeStateAsync(bool enabled);
-        Task<TpLinkResponse<ICollection<MacFilterDevice>>> MacFilterGetDeviceListAsync(bool enabled);
+        Task<bool> ChangeMacFilterStateAsync(bool enabled);
+        Task<TpLinkResponse<ICollection<MacFilterDevice>>> GetMacFilterGetDevicesAsync(bool enabled);
     }
 }
