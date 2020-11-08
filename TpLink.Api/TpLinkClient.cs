@@ -68,7 +68,7 @@ namespace TpLink.Api
                 // note: wont work when sending the request, since the request ain't sent as json! :(
                 //PropertyNamingPolicy = new TpLinkPropertyNamingPolicy(),
             };
-            // Ignore for now! tplink server returns wron'g content-type
+            // Ignore for now! tplink server returns wrong content-type
             //restClient.UseSystemTextJson(_option);
         }
 
@@ -92,22 +92,16 @@ namespace TpLink.Api
         //public async Task<TpLinkClientData> GetClientsAsync()
         public async Task<TpLinkClientData> GetClientsAsync()
         {
-            var plWirelessClientReq = new RestRequest("admin/wireless", Method.POST)
-            {
-                RequestFormat = DataFormat.None,
-                Parameters =
-                {
-                    new Parameter("form", "statistics", ParameterType.QueryString),
-                    new Parameter("operation", "load", ParameterType.GetOrPost),
-                },
-            };
+            var req = new RestRequest("admin/wireless", Method.POST);
+            req.AddParameter("form", "statistics", ParameterType.GetOrPost);
+            req.AddParameter("operation", "load", ParameterType.GetOrPost);
 
             //restClient.AddHandler("text/html", () => new JsonSerializer(_option));
             //restClient.RemoveHandler("text/html"); // exception
             // use system json serializer
             // IMPORTANT: TP-LINK SERVER DOESN'T RETURN THE CORRECT CONTENT TYPE WHICH
             // MAKE THE JSONSERIALIZER TO USE THE XML BY DEFAULT
-            IRestResponse response = await _apiConnection.ExecuteAsync(plWirelessClientReq).ConfigureAwait(false);
+            IRestResponse response = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
 
             // faulty response
             //var doc = JsonDocument.Parse(response.Content, new JsonDocumentOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
@@ -312,15 +306,9 @@ namespace TpLink.Api
 
         public async Task<TpLinkResponse<WifiMove>> WifiMoveAsync(bool enabled)
         {
-            var req = new RestRequest("/admin/wifiMove.json", Method.POST)
-            {
-                Parameters =
-                {
-                    new Parameter("operation", "write", ParameterType.GetOrPost),
-                    new Parameter("enable", enabled ? 1 : 0, ParameterType.GetOrPost),
-                }
-            };
-            //req.AddParameter("operation", "read");
+            var req = new RestRequest("/admin/wifiMove.json", Method.POST);
+            req.AddParameter("operation", "write", ParameterType.GetOrPost);
+            req.AddParameter("enable", enabled ? 1 : 0, ParameterType.GetOrPost);
 
             // TODO: NOT WORKING, BUT THE REQUEST LOOKS THE SAME AS FROM CHROME BROWSER!
             var res = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
