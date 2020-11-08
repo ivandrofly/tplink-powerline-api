@@ -118,24 +118,14 @@ namespace TpLink.Api
         /// </summary>
         public async Task<TpLinkResponse<IList<Device>>> GetPowerlineDevicesStatusAsync()
         {
-            var plStatusReq = new RestRequest("admin/powerline", Method.POST)
-            {
-                RequestFormat = DataFormat.None,
-                // deprecated
-                //Parameters =
-                //{
-                //    new Parameter("form", "plc_device", ParameterType.QueryString),
-                //    new Parameter("operation", "load", ParameterType.GetOrPost),
-                //}
-            };
-
-            plStatusReq.AddQueryParameter("form", "plc_device");
-            plStatusReq.AddParameter("operation", "load", ParameterType.GetOrPost);
+            var req = new RestRequest("admin/powerline", Method.POST);
+            req.AddQueryParameter("form", "plc_device");
+            req.AddParameter("operation", "load", ParameterType.GetOrPost);
 
             // IMPORTANT: TP-LINK SERVER RETURNS WRONG CONTENT TYPE (TEXT/HTML) WHICH INVOKES XML SERIALIZER BY DEFAULT
             //var response = await restClient.ExecuteAsync<TpLinkData<SystemLog>>(powerLineStatusRequest);
 
-            var response = await _apiConnection.ExecuteAsync(plStatusReq).ConfigureAwait(false);
+            var response = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
             if (response.StatusCode != HttpStatusCode.OK)
             {
                 return default;
@@ -202,21 +192,10 @@ namespace TpLink.Api
         public async Task<TpLinkResponse<WirelessModel>> ChangeWireless2GStatusAsync(bool enabled)
         {
             var tpLinkDataWM = await GetWirelessBand2GAsync();
-            var req = new RestRequest("admin/wireless", Method.POST)
-            {
-                //RequestFormat = DataFormat.Json
-                //Parameters =
-                //{
-                //    new Parameter("form", "wireless_2g", ParameterType.QueryString),
-                //    new Parameter("enable", "write", ParameterType.GetOrPost)
-                //}
-            };
-
+            var req = new RestRequest("admin/wireless", Method.POST);
             req.AddQueryParameter("form", "wireless_2g");
             //req.AddParameter("enable", enabled ? "on" : "off", ParameterType.GetOrPost);
             req.AddParameter("operation", "write", ParameterType.GetOrPost);
-
-            //goto required_only;
 
             // change the data 
             tpLinkDataWM.Data.Enable = enabled ? "on" : "off";
@@ -317,10 +296,7 @@ namespace TpLink.Api
 
         public async Task<TpLinkResponse<bool>> RebootAsync()
         {
-            var req = new RestRequest("/admin/reboot.json", Method.POST)
-            {
-                RequestFormat = DataFormat.None,
-            };
+            var req = new RestRequest("/admin/reboot.json", Method.POST);
             req.AddParameter("operation", "write", ParameterType.GetOrPost);
 
             _ = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
