@@ -83,6 +83,11 @@ namespace TpLink.Api
 
             // note: since the response comes wiht "content-type: text/html" it json parser will fail to parse it
             var response = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
+
+            if (!response.IsSuccessful)
+            {
+                return default;
+            }
             return JsonSerializer.Deserialize<TpLinkResponse<List<SystemLog>>>(response.Content, jsonOption) ?? new TpLinkResponse<List<SystemLog>>();
         }
 
