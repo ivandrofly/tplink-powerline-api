@@ -1,2 +1,1 @@
-if request is failing make sure you don't have web browser open when interacting with powerline
-using api... 
+if request is failing make sure you don't have web manager open
