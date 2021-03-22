@@ -4,7 +4,7 @@ using TpLink.Api.Models;
 
 Console.WriteLine("sending the discovery request...");
 
-bool discover = false;
+bool discover = true;
 
 string endpoint = discover ? await TpLinkClient.DiscoveryAsync() : "192.168.1.97";
 
