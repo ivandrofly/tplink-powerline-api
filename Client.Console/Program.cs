@@ -1,32 +1,30 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Net.NetworkInformation;
+using System.Threading.Tasks;
+using Client.Console;
+using Client.Console.Commands;
 using TpLink.Api;
 using TpLink.Api.Models;
 
-Console.WriteLine("sending the discovery request...");
 
-bool discover = true;
+var invoker = new Invoker();
 
-string endpoint = discover ? await TpLinkClient.DiscoveryAsync() : "192.168.1.97";
+// https://stackoverflow.com/questions/23048285/call-asynchronous-method-in-constructor
+await invoker.DiscoverAsync();
+//await invoker.DisplayClient();
+// await invoker.RunBatch();
 
-Console.WriteLine($"tp link address: {endpoint}");
-
-// wait for 5 secs befor resuming
-
-// get credentials from system environmetn variables
-string login = Environment.GetEnvironmentVariable("tplink_powerline_login", EnvironmentVariableTarget.User);
-string password = Environment.GetEnvironmentVariable("tplink_powerline_pwd", EnvironmentVariableTarget.User);
-
-#pragma warning disable CS0612 // Type or member is obsolete
-var client = new TpLink.Api.TpLinkClient(login, password, $"http://{endpoint}");
-#pragma warning restore CS0612 // Type or member is obsolete
+await invoker.TurnOn();
+//await invoker.Reboot();
 
 
-//todo: bug here!!!
-var res = await client.GetSystemLogsAsync();
-foreach (TpLink.Models.SystemLog item in res.Data)
-{
-    Console.WriteLine(item.Content);
-}
+// note: make sure you request is not being tunneled by vpn
+//var result = NetworkInterface.GetAllNetworkInterfaces().First(ni => ni.OperationalStatus == OperationalStatus.Up && ni.NetworkInterfaceType == NetworkInterfaceType.Ethernet);
+//var ips = result.GetIPProperties();
+//var v4IPv4Statistics = result.GetIPv4Statistics();
 
 // to
 var wifiSchedule = new WifiSchedule
@@ -37,5 +35,6 @@ var wifiSchedule = new WifiSchedule
     Days = Days.Monday | Days.Tuesday | Days.Wednesday | Days.Thursday | Days.Friday | Days.Saturday | Days.Sunday
 };
 
-var response = await client.AddNewWifiScheduleAsync(wifiSchedule).ConfigureAwait(false);
-Console.WriteLine(response);
+//var response = await client.AddNewWifiScheduleAsync(wifiSchedule).ConfigureAwait(false);
+//Console.WriteLine(response);
+Console.ReadLine();
