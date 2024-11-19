@@ -5,7 +5,7 @@
         <Authors>Ivandrofly</Authors>
         <Company>Ivandrofly</Company>
         <RepositoryUrl>https://your.repository.url/</RepositoryUrl>
-        <LangVersion>lastest</LangVersion>
+        <LangVersion>latest</LangVersion>
     </PropertyGroup>
 
     <!--    <ItemGroup>-->
