@@ -42,8 +42,10 @@ namespace TpLink.Api
                 // the entire request may be okay, but when the user agent's version changed, this may need to be updated aswell
                 // Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.163 Safari/537.36
                 // important: setting rule for user-agent in fiddler will override this, which can cause several complication
-                UserAgent = @"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.163 Safari/537.36", // a must!
-                Timeout = (int)TimeSpan.FromSeconds(10).TotalMilliseconds
+
+                // NOTE: NOT SUPPORTED ANYMORE!
+                // UserAgent = @"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.163 Safari/537.36", // a must!
+                // Timeout = (int)TimeSpan.FromSeconds(10).TotalMilliseconds,
             };
 
             _apiConnection.AddDefaultHeader("Cookie", $"Authorization={StringUtils.GetAuthorization(apiConnection.Login, apiConnection.Passoword)}");
@@ -77,7 +79,7 @@ namespace TpLink.Api
         /// </summary>
         public async Task<TpLinkResponse<List<SystemLog>>> GetSystemLogsAsync()
         {
-            var req = new RestRequest("admin/syslog", Method.POST);
+            var req = new RestRequest("admin/syslog", Method.Post);
             req.AddParameter("form", "log", ParameterType.QueryString);
             req.AddParameter("operation", "load", ParameterType.GetOrPost);
 
@@ -88,6 +90,7 @@ namespace TpLink.Api
             {
                 return default;
             }
+
             return JsonSerializer.Deserialize<TpLinkResponse<List<SystemLog>>>(response.Content, jsonOption) ?? new TpLinkResponse<List<SystemLog>>();
         }
 
@@ -97,7 +100,7 @@ namespace TpLink.Api
         //public async Task<TpLinkClientData> GetClientsAsync()
         public async Task<TpLinkClientData> GetClientsAsync()
         {
-            var req = new RestRequest("admin/wireless", Method.POST);
+            var req = new RestRequest("admin/wireless", Method.Post);
             req.AddParameter("form", "statistics", ParameterType.GetOrPost);
             req.AddParameter("operation", "load", ParameterType.GetOrPost);
 
@@ -106,7 +109,7 @@ namespace TpLink.Api
             // use system json serializer
             // IMPORTANT: TP-LINK SERVER DOESN'T RETURN THE CORRECT CONTENT TYPE WHICH
             // MAKE THE JSONSERIALIZER TO USE THE XML BY DEFAULT
-            IRestResponse response = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
+            var response = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
 
             // faulty response
             //var doc = JsonDocument.Parse(response.Content, new JsonDocumentOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
@@ -123,7 +126,7 @@ namespace TpLink.Api
         /// </summary>
         public async Task<TpLinkResponse<IList<Device>>> GetPowerlineDevicesStatusAsync()
         {
-            var req = new RestRequest("admin/powerline", Method.POST);
+            var req = new RestRequest("admin/powerline", Method.Post);
             req.AddQueryParameter("form", "plc_device");
             req.AddParameter("operation", "load", ParameterType.GetOrPost);
 
@@ -135,6 +138,7 @@ namespace TpLink.Api
             {
                 return default;
             }
+
             return JsonSerializer.Deserialize<TpLinkResponse<IList<Device>>>(response.Content, jsonOption);
         }
 
@@ -150,7 +154,7 @@ namespace TpLink.Api
         // TODO: remove - use same logic as 5ghz one
         public async Task<TpLinkResponse<WirelessModel>> GetWirelessBand2GAsync()
         {
-            var req = new RestRequest("admin/wireless", Method.POST);
+            var req = new RestRequest("admin/wireless", Method.Post);
             req.AddQueryParameter("form", "wireless_2g");
             req.AddParameter("operation", "read", ParameterType.GetOrPost);
             var res = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
@@ -197,7 +201,7 @@ namespace TpLink.Api
         public async Task<TpLinkResponse<WirelessModel>> ChangeWireless2GStatusAsync(bool enabled)
         {
             var tpLinkDataWM = await GetWirelessBand2GAsync();
-            var req = new RestRequest("admin/wireless", Method.POST);
+            var req = new RestRequest("admin/wireless", Method.Post);
             req.AddQueryParameter("form", "wireless_2g");
             //req.AddParameter("enable", enabled ? "on" : "off", ParameterType.GetOrPost);
             req.AddParameter("operation", "write", ParameterType.GetOrPost);
@@ -207,11 +211,11 @@ namespace TpLink.Api
 
             // map the prop name and value to a dictionary
             Dictionary<string, string> dictionary = tpLinkDataWM.Data.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                 .ToDictionary(prop =>
-                 {
-                     var jsonProp = prop.GetCustomAttribute<JsonPropertyNameAttribute>(true);
-                     return jsonProp == null ? prop.Name.ToLowerInvariant() : jsonProp.Name;
-                 }, prop => (string)prop.GetValue(tpLinkDataWM.Data));
+                .ToDictionary(prop =>
+                {
+                    var jsonProp = prop.GetCustomAttribute<JsonPropertyNameAttribute>(true);
+                    return jsonProp == null ? prop.Name.ToLowerInvariant() : jsonProp.Name;
+                }, prop => (string)prop.GetValue(tpLinkDataWM.Data));
 
             // trying to add dictionary with "AddObject" throws exception
             // req.AddObject(dictionary);
@@ -239,9 +243,9 @@ namespace TpLink.Api
         public async Task<TpLinkResponse<WirelessModel>> ChangeWireless5GStatusAsync(bool enabled)
         {
             // send request to retrive the currnet wifi password
-            var reqStatus = new RestRequest("admin/wlan_status", Method.POST);
+            var reqStatus = new RestRequest("admin/wlan_status", Method.Post);
             reqStatus.AddParameter("operation", "read", ParameterType.GetOrPost);
-            IRestResponse resStatus = await _apiConnection.ExecuteAsync(reqStatus).ConfigureAwait(false);
+            var resStatus = await _apiConnection.ExecuteAsync(reqStatus).ConfigureAwait(false);
 
             // operation failed
             if (resStatus.IsSuccessful == false)
@@ -269,7 +273,7 @@ namespace TpLink.Api
                 .GetProperty("wireless_5g_encryption").GetString();
 
             // build request to update 5ghz wireless
-            var req = new RestRequest("admin/wireless", Method.POST);
+            var req = new RestRequest("admin/wireless", Method.Post);
             req.AddQueryParameter("form", "wireless_5g");
             req.AddParameter("operation", "write", ParameterType.GetOrPost);
             req.AddParameter("enable", enabled ? "on" : "off", ParameterType.GetOrPost);
@@ -284,13 +288,13 @@ namespace TpLink.Api
             req.AddParameter("channel", "auto", ParameterType.GetOrPost);
             req.AddParameter("txpower", "low", ParameterType.GetOrPost);
 
-            IRestResponse res = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
+            var res = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
             return JsonSerializer.Deserialize<TpLinkResponse<WirelessModel>>(res.Content, jsonOption);
         }
 
         public async Task<TpLinkResponse<WifiMove>> WifiMoveAsync(bool enabled)
         {
-            var req = new RestRequest("/admin/wifiMove.json", Method.POST);
+            var req = new RestRequest("/admin/wifiMove.json", Method.Post);
             req.AddParameter("operation", "write", ParameterType.GetOrPost);
             req.AddParameter("enable", enabled ? 1 : 0, ParameterType.GetOrPost);
 
@@ -301,7 +305,7 @@ namespace TpLink.Api
 
         public async Task<TpLinkResponse<bool>> RebootAsync()
         {
-            var req = new RestRequest("/admin/reboot.json", Method.POST);
+            var req = new RestRequest("/admin/reboot.json", Method.Post);
             req.AddParameter("operation", "write", ParameterType.GetOrPost);
 
             _ = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
@@ -310,9 +314,9 @@ namespace TpLink.Api
 
         public async Task<TpLinkResponse<Guest2G>> GetGuest2GhzAsync()
         {
-            var req = new RestRequest("/admin/guest?form=guest_2g", Method.POST)
+            var req = new RestRequest("/admin/guest?form=guest_2g", Method.Post)
             {
-                Timeout = Convert.ToInt32(TimeSpan.FromSeconds(3).TotalMilliseconds)
+                Timeout = TimeSpan.FromSeconds(3)
             };
             req.AddQueryParameter("form", "guest_2g");
             req.AddParameter("operation", "read");
@@ -322,12 +326,13 @@ namespace TpLink.Api
             {
                 // isable in router
             }
+
             return JsonSerializer.Deserialize<TpLinkResponse<Guest2G>>(res.Content, jsonOption);
         }
 
         public async Task<TpLinkResponse<Guest5G>> GetGuest5GhzAsync()
         {
-            var req = new RestRequest("/admin/guest?form=guest_5g", Method.POST);
+            var req = new RestRequest("/admin/guest?form=guest_5g", Method.Post);
             req.AddQueryParameter("form", "guest_5g");
             req.AddParameter("operation", "read");
             var res = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
@@ -357,9 +362,12 @@ namespace TpLink.Api
             //uc.Client.Bind(new IPEndPoint(IPAddress.Any, 61000));
 
             // original data capture in wireshark (discover message in bytes)
-            var data = new byte[] { 0x02, 0x03, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+            var data = new byte[]
+            {
+                0x02, 0x03, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0xe8, 0x03, 0x12, 0x00, 0x75, 0x7c, 0xbe, 0x42, 0xdc, 0x81,
-                0x21, 0xf6, 0xe1, 0x5e, 0xff, 0xc0, 0xc4, 0x1e, 0x25, 0x96 };
+                0x21, 0xf6, 0xe1, 0x5e, 0xff, 0xc0, 0xc4, 0x1e, 0x25, 0x96
+            };
 
             var buffer = Encoding.UTF8.GetBytes("Where are you!");
 
@@ -384,10 +392,12 @@ namespace TpLink.Api
             {
                 throw new InvalidEnumArgumentException(nameof(WifiSchedule.StartTime));
             }
+
             if (wifiSchedule.EndTime < 0 || wifiSchedule.EndTime > 24)
             {
                 throw new InvalidEnumArgumentException(nameof(WifiSchedule.EndTime));
             }
+
             if (wifiSchedule.StartTime >= wifiSchedule.EndTime)
             {
                 throw new InvalidEnumArgumentException(nameof(WifiSchedule.StartTime));
@@ -414,14 +424,14 @@ namespace TpLink.Api
             //     Console.WriteLine(jc.ToString());
             // }
 
-            var req = new RestRequest("/admin/wlanTimeControl", Method.POST);
+            var req = new RestRequest("/admin/wlanTimeControl", Method.Post);
             req.AddParameter("operation", "insert");
             req.AddParameter("key", "add");
             req.AddParameter("index", "0"); // i think the index should be get from sorting all the pre existing rules and insert acoording to "from" time
             req.AddParameter("old", "add");
             req.AddParameter("new", JsonSerializer.Serialize(wifiSchedule, jsonOptions));
 
-            IRestResponse response = await _apiConnection.ExecuteAsync(req);
+            var response = await _apiConnection.ExecuteAsync(req);
 
             return await Task.FromResult(JsonSerializer.Deserialize<TpLinkResponse<ICollection<WifiSchedule>>>(response.Content));
         }
@@ -477,5 +487,4 @@ namespace TpLink.Api
         //    return ipAddress;
         //}
     }
-
 }
