@@ -1,0 +1,11 @@
+﻿<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="readme.txt" />
+    <File Path="Directory.Packages.props" />
+    <File Path="Directory.Build.props" />
+  </Folder>
+  <Project Path="Client.Console\Client.Console.csproj" Type="Classic C#" />
+  <Project Path="TpLink.Api\TpLink.Api.csproj" />
+  <Project Path="TpLink.UnitTest\TpLink.UnitTest.csproj" />
+  <Project Path="TpLinkDataRate\TpLink.Service.csproj" />
+</Solution>
