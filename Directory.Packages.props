@@ -1,0 +1,17 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    <NoWarn>$(NoWarn);NU1507</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="coverlet.collector" Version="1.2.0" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="16.5.0" />
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageVersion Include="RestSharp" Version="106.11.7" />
+    <PackageVersion Include="RestSharp.Serializers.SystemTextJson" Version="106.11.7" />
+    <PackageVersion Include="xunit" Version="2.4.0" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="2.4.0" />
+  </ItemGroup>
+</Project>

@@ -1,16 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk.Worker">
-
   <PropertyGroup>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <UserSecretsId>dotnet-TpLinkDataRate-0BC8325A-4131-4AF7-B2F9-35A58ED4F436</UserSecretsId>
   </PropertyGroup>
-
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="5.0.0-preview.8.20407.11" />
-    <PackageReference Include="RestSharp" Version="106.11.5-alpha.0.18" />
-    <PackageReference Include="RestSharp.Serializers.SystemTextJson" Version="106.11.5-alpha.0.18" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="RestSharp" />
+    <PackageReference Include="RestSharp.Serializers.SystemTextJson" />
   </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\TpLink.Api\TpLink.Api.csproj" />
   </ItemGroup>
