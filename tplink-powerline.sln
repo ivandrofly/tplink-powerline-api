@@ -12,6 +12,8 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{674B6B37-7157-434D-A544-108B7FE9007E}"
 	ProjectSection(SolutionItems) = preProject
 		readme.txt = readme.txt
+		Directory.Packages.props = Directory.Packages.props
+		Directory.Build.props = Directory.Build.props
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Client.Console", "Client.Console\Client.Console.csproj", "{CED25066-BA2B-4DA6-9CDE-7CB111D0D5BF}"

@@ -1,6 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk.Worker">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
     <UserSecretsId>dotnet-TpLinkDataRate-0BC8325A-4131-4AF7-B2F9-35A58ED4F436</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>

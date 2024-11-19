@@ -1,0 +1,14 @@
+<Project>
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <Configurations>Debug;Release</Configurations>
+        <Authors>Ivandrofly</Authors>
+        <Company>Ivandrofly</Company>
+        <RepositoryUrl>https://your.repository.url/</RepositoryUrl>
+        <LangVersion>lastest</LangVersion>
+    </PropertyGroup>
+
+    <!--    <ItemGroup>-->
+    <!--        <PackageReference Include="Newtonsoft.Json" Version="13.0.1"/>-->
+    <!--    </ItemGroup>-->
+</Project>
