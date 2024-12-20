@@ -1,9 +1,9 @@
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using System;
 using TpLink.Api;
 
-namespace TpLinkDataRate
+namespace TpLink.Service
 {
     public class Program
     {

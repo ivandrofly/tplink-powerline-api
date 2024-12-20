@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace TpLink.Models
+namespace TpLink.Api.Models
 {
     public class Guest5G : IGuestNetwork
     {

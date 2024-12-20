@@ -1,7 +1,6 @@
 ﻿using System.Text.Json.Serialization;
-using TpLink.Api.Models;
 
-namespace TpLink.Models
+namespace TpLink.Api.Models
 {
     public class TpLinkResponse<TData> : IResponseModel<TData>
     {

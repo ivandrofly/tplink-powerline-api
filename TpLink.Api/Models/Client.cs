@@ -1,7 +1,16 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace TpLink.Models
+namespace TpLink.Api.Models
 {
+    /// <summary>
+    /// Represents a client connected to a TP-Link network.
+    /// </summary>
+    /// <remarks>
+    /// This class encapsulates information about a network client,
+    /// including MAC address, type, encryption status, the number
+    /// of packets sent and received, IP address, and device name.
+    /// Some properties include custom serialization mappings.
+    /// </remarks>
     public class Client
     {
         public string Mac { get; set; }

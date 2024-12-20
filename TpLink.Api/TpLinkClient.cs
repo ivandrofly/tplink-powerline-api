@@ -12,7 +12,6 @@ using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using TpLink.Api.Helpers;
 using TpLink.Api.Models;
-using TpLink.Models;
 
 namespace TpLink.Api
 {

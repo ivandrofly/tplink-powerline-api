@@ -1,8 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Text.Json.Serialization;
-using TpLink.Api.Models;
 
-namespace TpLink.Models
+namespace TpLink.Api.Models
 {
     public class TpLinkClientData : TpLinkResponse<List<Client>>, IResponseModel<List<Client>>
     {

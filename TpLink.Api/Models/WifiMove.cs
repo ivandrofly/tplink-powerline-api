@@ -1,4 +1,4 @@
-namespace TpLink.Models
+namespace TpLink.Api.Models
 {
     public class WifiMove
     {
