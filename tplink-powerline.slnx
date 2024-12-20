@@ -1,4 +1,7 @@
 ﻿<Solution>
+  <Folder Name="/.devcontainer/">
+    <File Path=".devcontainer\devcontainer.json" />
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path="readme.txt" />
     <File Path="Directory.Packages.props" />
