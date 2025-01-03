@@ -79,6 +79,5 @@ namespace Client.Console
         //await Task.Delay(1000 * 60);
         //var turnOnSign = new TurnOnSignal();
         //await turnOnSign.Execute(powerLine);
-
     }
 }

@@ -12,10 +12,12 @@ namespace TpLink.Api.Helpers
             //  A string of hexadecimal pairs separated by hyphens, where each pair represents the corresponding element in value; for example, "7F-2C-4A-00"
             return BitConverter.ToString(hashBuffer).Replace("-", string.Empty).ToLowerInvariant();
         }
-        
+
         //System.Net.WebUtility.HtmlEncode()
         //System.Uri.EscapeDataString()
-        public static string GetAuthorization(string login, string password) => $"{Uri.EscapeDataString($"Basic {login}:{HashPassword(password)}")}";
-
+        public static string GetAuthorization(string login, string password)
+        {
+            return $"{Uri.EscapeDataString($"Basic {login}:{HashPassword(password)}")}";
+        }
     }
 }
