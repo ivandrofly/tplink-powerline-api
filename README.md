@@ -81,7 +81,12 @@ await client.AddNewWifiScheduleAsync(schedule);
 ```
 
 Every call returns a `TpLinkResponse<T>` with `Success`, `Timeout` and `Data`. Always check `Success`:
-the adapter answers with HTTP 200 even when it rejects a request (for example while another session is open).
+the adapter answers with HTTP 200 even when it rejects a request (for example while another session is open),
+and `Data` is `null` in that case.
+
+If the request never reaches the device (connection refused, timeout, a non-2xx status or an empty body) the
+client throws `TpLinkException`, which carries `StatusCode` and `TimedOut`. A body that is not the expected JSON
+throws `JsonException`.
 
 Authentication is a cookie: the client sends `Cookie: Authorization=Basic {login}:{md5(password)}`
 on every request, exactly as the browser does after login.
@@ -111,7 +116,9 @@ and the static `DiscoveryAsync()`, which are not on the interface.
 ## Discovery
 
 `TpLinkClient.DiscoveryAsync()` broadcasts a UDP packet to port `1040`, listens on port `61000`, and returns the IP of
-the first adapter that answers. Known limitations:
+the first adapter that answers. It waits 5 seconds by default and throws `TimeoutException` if nothing answers;
+`DiscoveryAsync(TimeSpan timeout, CancellationToken cancellationToken)` lets you change the wait or cancel it.
+Known limitations:
 
 - It does not work while traffic is tunnelled through a VPN.
 - With several adapters on the LAN it returns whichever answers first.
@@ -121,16 +128,17 @@ If discovery is unreliable in your setup, skip it and pass the adapter's IP to t
 
 ## Sample apps
 
-Two small host apps exercise the library. Both read credentials from two **user-scoped** environment variables:
+Two small host apps exercise the library. Both read credentials from two environment variables:
 
 | Variable | Value |
 | --- | --- |
 | `tplink_powerline_login` | Web-admin login (usually `admin`) |
 | `tplink_powerline_pwd` | Web-admin password |
 
-On Windows set them with `setx tplink_powerline_login admin` and `setx tplink_powerline_pwd <password>`
-(open a new terminal afterwards). .NET only supports user-scoped variables on Windows; on Linux or macOS
-pass the credentials straight to the `TpLinkClient` constructor instead.
+On Windows set them once with `setx tplink_powerline_login admin` and `setx tplink_powerline_pwd <password>`
+and open a new terminal, or set them for the current session with `$env:tplink_powerline_login = "admin"`.
+On Linux or macOS use `export tplink_powerline_login=admin`. Both apps fail fast with a message naming the
+variables when either one is missing.
 
 - **`Client.Console`**: `dotnet run --project Client.Console`. Discovers the adapter, then runs whichever
   command is uncommented in `Client.Console/Program.cs` (turn both radios on or off, reboot, list connected clients).
@@ -142,7 +150,9 @@ pass the credentials straight to the `TpLinkClient` constructor instead.
 
 - **Requests fail or `Success` is `false`**: close the adapter's web manager in your browser. The device allows a
   single admin session, and the browser holds it.
-- **Discovery hangs or times out**: disconnect from any VPN, check the firewall rule for UDP `61000`, or pass the IP manually.
+- **Discovery throws `TimeoutException`**: disconnect from any VPN, check the firewall rule for UDP `61000`, or pass the IP manually.
+- **`TpLinkException` on every call**: the adapter is unreachable at that address (wrong IP, powered off, or the
+  request timed out; check `TimedOut` and the inner exception).
 - **`JsonException` on a response with a base64 `data` string**: your firmware encrypts the web-admin traffic.
   See [Firmware compatibility](#firmware-compatibility).
 - **Responses arrive as `text/html`**: expected. The adapter labels its JSON as HTML, which is why the library

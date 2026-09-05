@@ -30,8 +30,17 @@ namespace Client.Console
 
         public async Task DiscoverAsync()
         {
-            string login = Environment.GetEnvironmentVariable("tplink_powerline_login", EnvironmentVariableTarget.User);
-            string pwd = Environment.GetEnvironmentVariable("tplink_powerline_pwd", EnvironmentVariableTarget.User);
+            // read the process environment: user-scoped variables (setx) are inherited on Windows, and this is the
+            // only scope that exists on Linux/macOS, where EnvironmentVariableTarget.User always returns null
+            string login = Environment.GetEnvironmentVariable("tplink_powerline_login");
+            string pwd = Environment.GetEnvironmentVariable("tplink_powerline_pwd");
+            if (string.IsNullOrWhiteSpace(login) || string.IsNullOrWhiteSpace(pwd))
+            {
+                throw new InvalidOperationException(
+                    "Set the tplink_powerline_login and tplink_powerline_pwd environment variables " +
+                    "(setx on Windows, export on Linux/macOS) and open a new terminal.");
+            }
+
             string endpoint = await TpLinkClient.DiscoveryAsync();
             powerLine = new TpLinkClient(login, pwd, $"http://{endpoint}");
         }
