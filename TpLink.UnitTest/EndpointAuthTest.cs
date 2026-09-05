@@ -8,8 +8,8 @@ namespace TpLink.UnitTest
     {
         [Theory]
         [InlineData(null, "pwd", "http://192.168.1.1", "login")]
-        [InlineData("admin", null, "http://192.168.1.1", "passoword")]
-        [InlineData("admin", "  ", "http://192.168.1.1", "passoword")]
+        [InlineData("admin", null, "http://192.168.1.1", "password")]
+        [InlineData("admin", "  ", "http://192.168.1.1", "password")]
         [InlineData("admin", "pwd", null, "endpoint")]
         [InlineData("admin", "pwd", "192.168.1.1", "endpoint")]
         [InlineData("admin", "pwd", "ftp://192.168.1.1", "endpoint")]

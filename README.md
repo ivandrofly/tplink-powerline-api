@@ -44,13 +44,19 @@ Reference the `TpLink.Api` project (there is no NuGet package yet), then:
 ```csharp
 using TpLink.Api;
 
-// Find the adapter on the LAN with a UDP broadcast, or hardcode its IP.
-string ip = await TpLinkClient.DiscoveryAsync();
-ITpLinkClient client = new TpLinkClient("admin", "your-password", $"http://{ip}");
+// Discovers the adapter on the LAN with a UDP broadcast; set Endpoint = "http://<ip>" to skip discovery.
+// The client owns an HTTP connection, so dispose it when you are done.
+using var client = await TpLinkClient.CreateAsync(new TpLinkOptions
+{
+    Login = "admin",
+    Password = "your-password",
+});
+
+// Or, with a known address: new TpLinkClient("admin", "your-password", "http://192.168.1.86")
 
 // Wi-Fi clients currently connected to the adapter
 var clients = await client.GetClientsAsync();
-foreach (var c in clients.Data)
+foreach (var c in clients.Data ?? [])
     Console.WriteLine($"{c.DeviceName} {c.IP} {c.Mac}");
 
 // Powerline peers and their link rates
@@ -86,7 +92,8 @@ and `Data` is `null` in that case.
 
 If the request never reaches the device (connection refused, timeout, a non-2xx status or an empty body) the
 client throws `TpLinkException`, which carries `StatusCode` and `TimedOut`. A body that is not the expected JSON
-throws `JsonException`.
+throws `JsonException`. Requests time out after 10 seconds by default (`TpLinkOptions.RequestTimeout` or the
+`TpLinkClient(EndpointAuth, TimeSpan)` constructor change that), and every method takes an optional `CancellationToken`.
 
 Authentication is a cookie: the client sends `Cookie: Authorization=Basic {login}:{md5(password)}`
 on every request, exactly as the browser does after login.
@@ -98,20 +105,21 @@ All members of `ITpLinkClient`, with their status on the TL-WPA8630P:
 | Method | Status | Notes |
 | --- | --- | --- |
 | `GetClientsAsync()` | Works | Connected Wi-Fi clients: name, IP, MAC, packets. |
-| `GetCountConnectedClientsAsync()` | Works | Convenience wrapper over the above. |
+| `GetConnectedClientCountAsync()` | Works | Convenience wrapper over the above; 0 when the device rejects the request. |
 | `GetPowerlineDevicesStatusAsync()` | Works | Powerline peers with RX/TX rate. |
 | `GetSystemLogsAsync()` | Works | Device system log. |
-| `GetGuest2GhzAsync()` / `GetGuest5GhzAsync()` | Works | Reads guest network settings. |
+| `GetWirelessBand2GAsync()` / `GetWirelessBand5GAsync()` | Works | Reads the radio settings. |
+| `GetGuest2GAsync()` / `GetGuest5GAsync()` | Works | Reads guest network settings. |
 | `ChangeWireless5GStatusAsync(bool)` | Works | Turns the 5 GHz radio on or off. Reads the current settings first and posts them back unchanged. |
 | `ChangeWireless2GStatusAsync(bool)` | Works | Same as above for the 2.4 GHz radio. |
 | `RebootAsync()` | Works | Fire-and-forget; always returns `Data = true`. |
 | `AddNewWifiScheduleAsync(WifiSchedule)` | Works | Inserts the rule at index 0. |
-| `WifiMoveAsync(bool)` | Not working | The request matches the browser's but the device does not apply it. |
-| `AddNewUserAsync()` | Not implemented | Throws `NotImplementedException`. |
-| `AddMacFilterAsync` / `RemoveMacFilterAsync` / `ChangeMacFilterStateAsync` / `GetMacFilterGetDevicesAsync` | Not implemented | Throw `NotImplementedException`. |
+| `SetWifiMoveAsync(bool)` | Not working | The request matches the browser's but the device does not apply it. |
 
-`TpLinkClient` also exposes `GetWirelessBand2GAsync()` and `GetWirelessBand5GAsync()` (read the radio settings)
-and the static `DiscoveryAsync()`, which are not on the interface.
+Every member takes an optional `CancellationToken`, and `ITpLinkClient` is `IDisposable`. The static
+`TpLinkClient.DiscoveryAsync()` and `TpLinkClient.CreateAsync(TpLinkOptions)` are not on the interface.
+User management and MAC filtering are not implemented; the earlier placeholder members that threw
+`NotImplementedException` were removed, and contributions that capture those form posts are welcome.
 
 ## Discovery
 
@@ -128,23 +136,28 @@ If discovery is unreliable in your setup, skip it and pass the adapter's IP to t
 
 ## Sample apps
 
-Two small host apps exercise the library. Both read credentials from two environment variables:
+Two small host apps exercise the library. Both build a `TpLinkOptions` and read anything missing from these
+environment variables:
 
 | Variable | Value |
 | --- | --- |
 | `tplink_powerline_login` | Web-admin login (usually `admin`) |
 | `tplink_powerline_pwd` | Web-admin password |
+| `tplink_powerline_endpoint` | Optional adapter URL such as `http://192.168.1.86`; skips discovery when set |
 
 On Windows set them once with `setx tplink_powerline_login admin` and `setx tplink_powerline_pwd <password>`
 and open a new terminal, or set them for the current session with `$env:tplink_powerline_login = "admin"`.
 On Linux or macOS use `export tplink_powerline_login=admin`. Both apps fail fast with a message naming the
-variables when either one is missing.
+configuration keys and variables when the login or password is missing.
 
 - **`Client.Console`**: `dotnet run --project Client.Console`. Discovers the adapter, then runs whichever
   command is uncommented in `Client.Console/Program.cs` (turn both radios on or off, reboot, list connected clients).
   Edit `Program.cs` to pick a different action.
 - **`TpLink.Service`**: `dotnet run --project TpLinkDataRate/TpLink.Service.csproj`. A generic-host
-  `BackgroundService` that discovers the adapter, enables the 5 GHz radio and prints the powerline peer status.
+  `BackgroundService` that connects to the adapter and logs the link rate of every powerline peer every
+  `Worker:PollInterval` (5 seconds by default, see `appsettings.json`). It also binds the `TpLink` configuration
+  section, so the credentials can come from user-secrets (`dotnet user-secrets set TpLink:Password <password>`
+  inside `TpLinkDataRate/`), from `appsettings.json`, or from `TpLink__Login`-style environment variables.
 
 ## Troubleshooting
 
