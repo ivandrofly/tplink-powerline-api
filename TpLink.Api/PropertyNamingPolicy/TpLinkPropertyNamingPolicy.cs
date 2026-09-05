@@ -1,23 +1,18 @@
-﻿using System;
-using System.Text.RegularExpressions;
+using System.Text.Json;
 
 namespace TpLink.Api.PropertyNamingPolicy
 {
-    public class TpLinkPropertyNamingPolicy : System.Text.Json.JsonNamingPolicy
+    /// <summary>
+    /// Lower-cases property names that carry no <c>JsonPropertyName</c> attribute (<c>SSID</c> becomes <c>ssid</c>,
+    /// <c>Enable</c> becomes <c>enable</c>), which is how the adapter names every field. Registered on the shared
+    /// serializer options, it drives both response matching and the form fields emitted from a model.
+    /// </summary>
+    /// <remarks>
+    /// An earlier version tried to insert underscores at case boundaries ("PskKey" to "psk_key") but was never
+    /// registered; fields that need underscores carry an explicit <c>JsonPropertyName</c> instead.
+    /// </remarks>
+    public class TpLinkPropertyNamingPolicy : JsonNamingPolicy
     {
-        private readonly Regex _regexCasing = new Regex("[a-z][A-Z]", RegexOptions.Compiled);
-        public override string ConvertName(string name)
-        {
-            return name;
-
-            // ignore for now
-            var match = _regexCasing.Match(name);
-            if (match.Success)
-            {
-                name = name.Insert(match.Index + 1, "_");
-            }
-            name = name.ToLower();
-            return name;
-        }
+        public override string ConvertName(string name) => name.ToLowerInvariant();
     }
 }

@@ -43,9 +43,9 @@ namespace TpLink.Service
                 var res = await _tpLinkClient.ChangeWireless5GStatusAsync(true);
 
                 var response = await _tpLinkClient.GetPowerlineDevicesStatusAsync();
-                if (response.Success)
+                if (response.Success && response.Data != null)
                 {
-                    Console.WriteLine($"password: {response.Data.First().Password}");
+                    Console.WriteLine($"password: {response.Data.FirstOrDefault()?.Password}");
                     Console.WriteLine("operation success");
                 }
                 else

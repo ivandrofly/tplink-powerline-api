@@ -20,10 +20,16 @@ namespace TpLink.Service
             return Host.CreateDefaultBuilder(args)
                 .ConfigureServices( /*async*/ (hostContext, services) =>
                 {
-                    string login =
-                        Environment.GetEnvironmentVariable("tplink_powerline_login", EnvironmentVariableTarget.User);
-                    string password =
-                        Environment.GetEnvironmentVariable("tplink_powerline_pwd", EnvironmentVariableTarget.User);
+                    // read the process environment: user-scoped variables (setx) are inherited on Windows, and this is
+                    // the only scope that exists on Linux/macOS, where EnvironmentVariableTarget.User always returns null
+                    string login = Environment.GetEnvironmentVariable("tplink_powerline_login");
+                    string password = Environment.GetEnvironmentVariable("tplink_powerline_pwd");
+                    if (string.IsNullOrWhiteSpace(login) || string.IsNullOrWhiteSpace(password))
+                    {
+                        throw new InvalidOperationException(
+                            "Set the tplink_powerline_login and tplink_powerline_pwd environment variables " +
+                            "(setx on Windows, export on Linux/macOS) and open a new terminal.");
+                    }
 
                     // note: ensure the vpn is turned off / net
                     // can also be checked here: Control Panel\Network and Internet\Network Connections

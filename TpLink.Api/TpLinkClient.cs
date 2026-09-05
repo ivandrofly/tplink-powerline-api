@@ -1,23 +1,46 @@
-﻿using RestSharp;
+using RestSharp;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Net;
 using System.Net.Sockets;
-using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 using TpLink.Api.Helpers;
 using TpLink.Api.Models;
+using TpLink.Api.PropertyNamingPolicy;
 
 namespace TpLink.Api
 {
     public class TpLinkClient : ITpLinkClient
     {
-        private readonly RestClient _apiConnection; // name "connection" doesn't handle the validation
-        private readonly JsonSerializerOptions jsonOption;
+        /// <summary>UDP port the adapter listens on for the discovery broadcast.</summary>
+        public const int DiscoveryPort = 1040;
+
+        /// <summary>Local UDP port the discovery reply is received on (open it in the firewall).</summary>
+        public const int DiscoveryListenPort = 61000;
+
+        /// <summary>How long <see cref="DiscoveryAsync()"/> waits for an adapter to answer.</summary>
+        public static readonly TimeSpan DefaultDiscoveryTimeout = TimeSpan.FromSeconds(5);
+
+        /// <summary>
+        /// Serializer options shared by every call, for reading responses and for turning models into form fields:
+        /// case-insensitive matching, lower-case property names (the device's field names are lower-case) and nulls
+        /// skipped so they are never emitted as empty form fields.
+        /// </summary>
+        internal static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
+        {
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            PropertyNameCaseInsensitive = true,
+            PropertyNamingPolicy = new TpLinkPropertyNamingPolicy(),
+            AllowTrailingCommas = true,
+            ReadCommentHandling = JsonCommentHandling.Skip,
+        };
+
+        private readonly RestClient _apiConnection;
 
         public EndpointAuth EndpointAuth { get; }
 
@@ -57,46 +80,96 @@ namespace TpLink.Api
             _apiConnection.AddDefaultHeader("Connection", "keep-alive");
             _apiConnection.AddDefaultHeader("DNT", "1");
 
-            // default serializer options
-            jsonOption = new JsonSerializerOptions
-            {
-                IgnoreNullValues = true,
-                PropertyNameCaseInsensitive = true,
-                WriteIndented = true,
-                AllowTrailingCommas = true,
-                ReadCommentHandling = JsonCommentHandling.Skip
-                // note: wont work when sending the request, since the request ain't sent as json! :(
-                //PropertyNamingPolicy = new TpLinkPropertyNamingPolicy(),
-            };
             // Ignore for now! tplink server returns wrong content-type
             //restClient.UseSystemTextJson(_option);
         }
 
         /// <summary>
+        /// Send a request and deserialize its JSON body. The adapter labels its JSON as <c>text/html</c>, which makes
+        /// RestSharp's typed <c>ExecuteAsync&lt;T&gt;</c> pick the wrong serializer, so deserialization is done here.
+        /// </summary>
+        /// <exception cref="TpLinkException">
+        /// The request never completed (connection refused, timed out, aborted) or the device answered with a
+        /// non-success HTTP status or an empty body. RestSharp does not throw in those cases: it sets
+        /// <c>ResponseStatus</c>/<c>ErrorException</c> and leaves <c>Content</c> null, which used to surface as an
+        /// <see cref="ArgumentNullException"/> from the deserializer.
+        /// </exception>
+        /// <exception cref="JsonException">The body is not the expected JSON (for example firmware that encrypts the web-admin traffic).</exception>
+        private async Task<T> SendAsync<T>(RestRequest request, CancellationToken cancellationToken = default) where T : class
+        {
+            var response = await _apiConnection.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
+
+            if (response.ResponseStatus != ResponseStatus.Completed)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var detail = response.ErrorMessage ?? response.ErrorException?.Message ?? "no details";
+                throw new TpLinkException($"Request to '{request.Resource}' did not complete ({response.ResponseStatus}): {detail}", response.ErrorException)
+                {
+                    StatusCode = response.StatusCode,
+                    TimedOut = response.ResponseStatus == ResponseStatus.TimedOut,
+                };
+            }
+
+            if (!response.IsSuccessStatusCode || string.IsNullOrEmpty(response.Content))
+            {
+                var body = string.IsNullOrEmpty(response.Content) ? "an empty body" : "a body";
+                throw new TpLinkException($"Request to '{request.Resource}' returned HTTP {(int)response.StatusCode} {response.StatusDescription} with {body}")
+                {
+                    StatusCode = response.StatusCode,
+                };
+            }
+
+            return JsonSerializer.Deserialize<T>(response.Content, JsonOptions)
+                   ?? throw new TpLinkException($"Request to '{request.Resource}' returned a JSON null body")
+                   {
+                       StatusCode = response.StatusCode,
+                   };
+        }
+
+        /// <summary>
+        /// Emit every non-null property of <paramref name="model"/> as a form field. The model is serialized with
+        /// <see cref="JsonOptions"/> and flattened, so <c>JsonPropertyName</c> attributes, the lower-case naming policy
+        /// and the converters in <c>TpLink.Api.Converters</c> all apply, exactly as they do when the model is read.
+        /// </summary>
+        /// <remarks>
+        /// Replaces a reflection loop that cast every property to <c>string</c> (it would have thrown for the first
+        /// bool or converter-backed property) and emitted null properties as empty fields.
+        /// </remarks>
+        internal static void AddFormFields<T>(RestRequest request, T model)
+        {
+            using var document = JsonDocument.Parse(JsonSerializer.Serialize(model, JsonOptions));
+            foreach (var property in document.RootElement.EnumerateObject())
+            {
+                if (property.Value.ValueKind == JsonValueKind.Null)
+                {
+                    continue;
+                }
+
+                var value = property.Value.ValueKind == JsonValueKind.String
+                    ? property.Value.GetString()
+                    : property.Value.GetRawText();
+
+                request.AddParameter(property.Name, value, ParameterType.GetOrPost);
+            }
+        }
+
+        /// <summary>
         /// Get System logs
         /// </summary>
-        public async Task<TpLinkResponse<List<SystemLog>>> GetSystemLogsAsync()
+        public Task<TpLinkResponse<List<SystemLog>>> GetSystemLogsAsync()
         {
             var req = new RestRequest("admin/syslog", Method.Post);
             req.AddParameter("form", "log", ParameterType.QueryString);
             req.AddParameter("operation", "load", ParameterType.GetOrPost);
 
-            // note: since the response comes wiht "content-type: text/html" it json parser will fail to parse it
-            var response = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
-
-            if (!response.IsSuccessful)
-            {
-                return default;
-            }
-
-            return JsonSerializer.Deserialize<TpLinkResponse<List<SystemLog>>>(response.Content, jsonOption) ?? new TpLinkResponse<List<SystemLog>>();
+            return SendAsync<TpLinkResponse<List<SystemLog>>>(req);
         }
 
         /// <summary>
         /// Get wireless clients connected to the powerline
         /// </summary>
-        //public async Task<TpLinkClientData> GetClientsAsync()
-        public async Task<TpLinkClientData> GetClientsAsync()
+        public Task<TpLinkClientData> GetClientsAsync()
         {
             var req = new RestRequest("admin/wireless", Method.Post);
             req.AddParameter("form", "statistics", ParameterType.GetOrPost);
@@ -104,49 +177,31 @@ namespace TpLink.Api
 
             //restClient.AddHandler("text/html", () => new JsonSerializer(_option));
             //restClient.RemoveHandler("text/html"); // exception
-            // use system json serializer
             // IMPORTANT: TP-LINK SERVER DOESN'T RETURN THE CORRECT CONTENT TYPE WHICH
             // MAKE THE JSONSERIALIZER TO USE THE XML BY DEFAULT
-            var response = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
-
-            // faulty response
-            //var doc = JsonDocument.Parse(response.Content, new JsonDocumentOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
-            //if (doc.RootElement.GetProperty("success").GetBoolean() == true)
-            //{
-            //    Console.WriteLine("failed");
-            //}
-
-            return JsonSerializer.Deserialize<TpLinkClientData>(response.Content, jsonOption);
+            return SendAsync<TpLinkClientData>(req);
         }
 
         /// <summary>
         /// Get powerline status, including transfer and received data rate
         /// </summary>
-        public async Task<TpLinkResponse<IList<Device>>> GetPowerlineDevicesStatusAsync()
+        public Task<TpLinkResponse<IList<Device>>> GetPowerlineDevicesStatusAsync()
         {
             var req = new RestRequest("admin/powerline", Method.Post);
             req.AddQueryParameter("form", "plc_device");
             req.AddParameter("operation", "load", ParameterType.GetOrPost);
 
-            // IMPORTANT: TP-LINK SERVER RETURNS WRONG CONTENT TYPE (TEXT/HTML) WHICH INVOKES XML SERIALIZER BY DEFAULT
-            //var response = await restClient.ExecuteAsync<TpLinkData<SystemLog>>(powerLineStatusRequest);
-
-            var response = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
-            if (response.StatusCode != HttpStatusCode.OK)
-            {
-                return default;
-            }
-
-            return JsonSerializer.Deserialize<TpLinkResponse<IList<Device>>>(response.Content, jsonOption);
+            return SendAsync<TpLinkResponse<IList<Device>>>(req);
         }
 
         /// <summary>
-        /// Get number of clients currently connected
+        /// Get number of clients currently connected. Returns 0 when the device rejects the request
+        /// (check <see cref="GetClientsAsync"/> and its <c>Success</c> flag for the reason).
         /// </summary>
         public async Task<int> GetCountConnectedClientsAsync()
         {
-            var clients = await GetClientsAsync();
-            return clients.Data.Count;
+            var clients = await GetClientsAsync().ConfigureAwait(false);
+            return clients.Data?.Count ?? 0;
         }
 
         /// <summary>
@@ -159,16 +214,15 @@ namespace TpLink.Api
         /// </summary>
         public Task<TpLinkResponse<WirelessModel>> GetWirelessBand5GAsync() => GetWirelessBandAsync("wireless_5g");
 
-        private async Task<TpLinkResponse<WirelessModel>> GetWirelessBandAsync(string form)
+        private Task<TpLinkResponse<WirelessModel>> GetWirelessBandAsync(string form)
         {
             var req = new RestRequest("admin/wireless", Method.Post);
             req.AddQueryParameter("form", form);
             req.AddParameter("operation", "read", ParameterType.GetOrPost);
-            var res = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
 
             // note: earlier experiments that poked at "data.enable" directly (Newtonsoft JObject.SelectToken,
             // JsonDocument.GetProperty, Deserialize<dynamic>) were dropped in favour of deserializing the whole model.
-            return JsonSerializer.Deserialize<TpLinkResponse<WirelessModel>>(res.Content, jsonOption);
+            return SendAsync<TpLinkResponse<WirelessModel>>(req);
         }
 
         public Task<TpLinkResponse<WirelessModel>> ChangeWireless2GStatusAsync(bool enabled) => ChangeWirelessStatusAsync("wireless_2g", enabled);
@@ -187,7 +241,7 @@ namespace TpLink.Api
         private async Task<TpLinkResponse<WirelessModel>> ChangeWirelessStatusAsync(string form, bool enabled)
         {
             var current = await GetWirelessBandAsync(form).ConfigureAwait(false);
-            if (current?.Data == null)
+            if (current.Data == null)
             {
                 // the device refused the read (typically because the web manager is open in a browser);
                 // hand that envelope back so the caller sees Success == false instead of a NullReferenceException
@@ -199,35 +253,20 @@ namespace TpLink.Api
             var req = new RestRequest("admin/wireless", Method.Post);
             req.AddQueryParameter("form", form);
             req.AddParameter("operation", "write", ParameterType.GetOrPost);
+            // note: req.AddObject(model) throws for this shape, hence the explicit flattening
+            AddFormFields(req, current.Data);
 
-            // emit every property the device sent us as a form field, named after its JsonPropertyName
-            // (or the lower-cased property name). Properties the device did not send are skipped, so the
-            // 5 GHz write does not carry the 2.4 GHz-only "wireless_2g_disabled*" fields.
-            // note: req.AddObject(model) throws for this shape, hence the explicit loop.
-            foreach (var prop in typeof(WirelessModel).GetProperties(BindingFlags.Public | BindingFlags.Instance))
-            {
-                if (prop.GetValue(current.Data) is not string value)
-                {
-                    continue;
-                }
-
-                var jsonProp = prop.GetCustomAttribute<JsonPropertyNameAttribute>(true);
-                req.AddParameter(jsonProp?.Name ?? prop.Name.ToLowerInvariant(), value, ParameterType.GetOrPost);
-            }
-
-            var res = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
-            return JsonSerializer.Deserialize<TpLinkResponse<WirelessModel>>(res.Content, jsonOption);
+            return await SendAsync<TpLinkResponse<WirelessModel>>(req).ConfigureAwait(false);
         }
 
-        public async Task<TpLinkResponse<WifiMove>> WifiMoveAsync(bool enabled)
+        public Task<TpLinkResponse<WifiMove>> WifiMoveAsync(bool enabled)
         {
             var req = new RestRequest("/admin/wifiMove.json", Method.Post);
             req.AddParameter("operation", "write", ParameterType.GetOrPost);
             req.AddParameter("enable", enabled ? 1 : 0, ParameterType.GetOrPost);
 
             // TODO: NOT WORKING, BUT THE REQUEST LOOKS THE SAME AS FROM CHROME BROWSER!
-            var res = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
-            return JsonSerializer.Deserialize<TpLinkResponse<WifiMove>>(res.Content, jsonOption);
+            return SendAsync<TpLinkResponse<WifiMove>>(req);
         }
 
         public async Task<TpLinkResponse<bool>> RebootAsync()
@@ -235,11 +274,13 @@ namespace TpLink.Api
             var req = new RestRequest("/admin/reboot.json", Method.Post);
             req.AddParameter("operation", "write", ParameterType.GetOrPost);
 
+            // the device drops the connection while it reboots, so there is often no usable body:
+            // this call is fire-and-forget and deliberately bypasses SendAsync
             _ = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
-            return await Task.FromResult(new TpLinkResponse<bool> { Data = true });
+            return new TpLinkResponse<bool> { Success = true, Data = true };
         }
 
-        public async Task<TpLinkResponse<Guest2G>> GetGuest2GhzAsync()
+        public Task<TpLinkResponse<Guest2G>> GetGuest2GhzAsync()
         {
             var req = new RestRequest("/admin/guest?form=guest_2g", Method.Post)
             {
@@ -247,64 +288,75 @@ namespace TpLink.Api
             };
             req.AddQueryParameter("form", "guest_2g");
             req.AddParameter("operation", "read");
-            var res = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
 
-            if (res.StatusCode == HttpStatusCode.RequestTimeout)
-            {
-                // isable in router
-            }
-
-            return JsonSerializer.Deserialize<TpLinkResponse<Guest2G>>(res.Content, jsonOption);
+            // a timeout (guest network disabled in the router?) surfaces as TpLinkException.TimedOut
+            return SendAsync<TpLinkResponse<Guest2G>>(req);
         }
 
-        public async Task<TpLinkResponse<Guest5G>> GetGuest5GhzAsync()
+        public Task<TpLinkResponse<Guest5G>> GetGuest5GhzAsync()
         {
             var req = new RestRequest("/admin/guest?form=guest_5g", Method.Post);
             req.AddQueryParameter("form", "guest_5g");
             req.AddParameter("operation", "read");
-            var res = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
 
-            var jdoc = JsonDocument.Parse(res.Content, new JsonDocumentOptions
-            {
-                AllowTrailingCommas = true,
-                CommentHandling = JsonCommentHandling.Skip
-            });
-
-            return JsonSerializer.Deserialize<TpLinkResponse<Guest5G>>(res.Content, jsonOption);
+            return SendAsync<TpLinkResponse<Guest5G>>(req);
         }
 
         /// <summary>
-        /// Find out which ip address is signed to the powerline.
+        /// Find out which ip address is assigned to the powerline, waiting up to <see cref="DefaultDiscoveryTimeout"/>.
         /// </summary>
         /// <returns>The ip address of the powerline</returns>
-        public static async Task<string> DiscoveryAsync()
+        /// <exception cref="TimeoutException">No adapter answered in time.</exception>
+        public static Task<string> DiscoveryAsync() => DiscoveryAsync(DefaultDiscoveryTimeout);
+
+        /// <summary>
+        /// Find out which ip address is assigned to the powerline by broadcasting on UDP <see cref="DiscoveryPort"/>
+        /// and listening on <see cref="DiscoveryListenPort"/>. The first adapter that answers wins.
+        /// </summary>
+        /// <param name="timeout">How long to wait for an answer.</param>
+        /// <param name="cancellationToken">Cancels the wait early.</param>
+        /// <returns>The ip address of the powerline</returns>
+        /// <exception cref="TimeoutException">No adapter answered within <paramref name="timeout"/>.</exception>
+        /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
+        public static async Task<string> DiscoveryAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
         {
             // note here 192.168.1.86 was the ip that powerline was using - this is dynamic can change
-            // wireshark filter: (ip.dst == 192.168.1.108 && ip.src == 192.168.1.86 ) || (ip.dst == 255.255.255.255) 
-            using var uc = new UdpClient(new IPEndPoint(IPAddress.Any, 61000))
+            // wireshark filter: (ip.dst == 192.168.1.108 && ip.src == 192.168.1.86 ) || (ip.dst == 255.255.255.255)
+            // original discover message captured in wireshark (bytes); the plain "Where are you!" text below works too:
+            // 02 03 01 00 00 00 00 00 e8 03 12 00 75 7c be 42 dc 81 21 f6 e1 5e ff c0 c4 1e 25 96
+            using var uc = new UdpClient();
+            // let a second instance (or a socket lingering from the previous run) bind the same port instead of throwing
+            uc.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+            uc.Client.Bind(new IPEndPoint(IPAddress.Any, DiscoveryListenPort));
+            uc.EnableBroadcast = true;
+
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(timeout);
+
+            try
             {
-                EnableBroadcast = true,
-            };
+                var buffer = Encoding.UTF8.GetBytes("Where are you!");
 
-            //uc.Client.Bind(new IPEndPoint(IPAddress.Any, 61000));
+                // note: see https://stackoverflow.com/a/40617102/2766753 for a more reliable udp implementation
+                await uc.SendAsync(buffer, new IPEndPoint(IPAddress.Broadcast, DiscoveryPort), cts.Token).ConfigureAwait(false);
 
-            // original data capture in wireshark (discover message in bytes)
-            var data = new byte[]
+                // the first datagram that carries a payload wins; empty datagrams are ignored
+                while (true)
+                {
+                    var reply = await uc.ReceiveAsync(cts.Token).ConfigureAwait(false);
+                    if (reply.Buffer.Length > 0)
+                    {
+                        return reply.RemoteEndPoint.Address.ToString();
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
-                0x02, 0x03, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0xe8, 0x03, 0x12, 0x00, 0x75, 0x7c, 0xbe, 0x42, 0xdc, 0x81,
-                0x21, 0xf6, 0xe1, 0x5e, 0xff, 0xc0, 0xc4, 0x1e, 0x25, 0x96
-            };
-
-            var buffer = Encoding.UTF8.GetBytes("Where are you!");
-
-            // note: i think this is not really safe, because if powerline was fast enough the receive won't be able to capture
-            // see: https://stackoverflow.com/a/40617102/2766753 for more relaiable udp implementation
-            var count = await uc.SendAsync(buffer, buffer.Length, IPAddress.Broadcast.ToString(), 1040).ConfigureAwait(false);
-            UdpReceiveResult udpResponse = await uc.ReceiveAsync().ConfigureAwait(false);
-
-            // get the discovered ip addres of the powerline
-            return udpResponse.RemoteEndPoint.Address.ToString();
+                throw new TimeoutException(
+                    $"No TP-Link powerline adapter answered the discovery broadcast (UDP {DiscoveryListenPort} -> {DiscoveryPort}) " +
+                    $"within {timeout.TotalSeconds:0.#} s. Make sure no VPN is active, the adapter is on this LAN and the firewall " +
+                    $"allows inbound UDP on port {DiscoveryListenPort}, or pass the adapter's IP to the constructor instead.");
+            }
         }
 
         public Task<object> AddNewUserAsync()
@@ -312,7 +364,7 @@ namespace TpLink.Api
             throw new NotImplementedException();
         }
 
-        public async Task<TpLinkResponse<ICollection<WifiSchedule>>> AddNewWifiScheduleAsync(WifiSchedule wifiSchedule)
+        public Task<TpLinkResponse<ICollection<WifiSchedule>>> AddNewWifiScheduleAsync(WifiSchedule wifiSchedule)
         {
             // validation
             if (wifiSchedule.StartTime < 0 || wifiSchedule.StartTime > 24)
@@ -330,37 +382,20 @@ namespace TpLink.Api
                 throw new InvalidEnumArgumentException(nameof(WifiSchedule.StartTime));
             }
 
-            var jsonOptions = new JsonSerializerOptions
-            {
-                WriteIndented = false,
-                IgnoreNullValues = true,
-                AllowTrailingCommas = true,
-                PropertyNameCaseInsensitive = true,
-                //PropertyNamingPolicy = new PropertyNamingPolicy.TpLinkPropertyNamingPolicy
-            };
-
             // JsonConverterFactory
             // https://docs.microsoft.com/en-us/dotnet/standard/serialization/system-text-json-converters-how-to#support-dictionary-with-non-string-key
-
             // https://docs.microsoft.com/en-us/dotnet/standard/serialization/system-text-json-converters-how-to#registration-sample---converters-collection
-            // jsonOptions.Converters.Add(new DateTimeOffsetConverter());
-
-            // displaying registered converters
-            // foreach (JsonConverter jc in jsonOptions.Converters)
-            // {
-            //     Console.WriteLine(jc.ToString());
-            // }
 
             var req = new RestRequest("/admin/wlanTimeControl", Method.Post);
             req.AddParameter("operation", "insert");
             req.AddParameter("key", "add");
             req.AddParameter("index", "0"); // i think the index should be get from sorting all the pre existing rules and insert acoording to "from" time
             req.AddParameter("old", "add");
-            req.AddParameter("new", JsonSerializer.Serialize(wifiSchedule, jsonOptions));
+            req.AddParameter("new", JsonSerializer.Serialize(wifiSchedule, JsonOptions));
 
-            var response = await _apiConnection.ExecuteAsync(req);
-
-            return await Task.FromResult(JsonSerializer.Deserialize<TpLinkResponse<ICollection<WifiSchedule>>>(response.Content));
+            // note: this used to deserialize without the shared options, so "success"/"timeout" never mapped
+            // onto Success/Timeout and every caller saw Success == false
+            return SendAsync<TpLinkResponse<ICollection<WifiSchedule>>>(req);
         }
 
         public Task<MacFilterDevice> AddMacFilterAsync(MacFilterDevice macFilter)

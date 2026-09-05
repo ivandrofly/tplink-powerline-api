@@ -6,4 +6,7 @@
     <PackageReference Include="RestSharp" />
     <PackageReference Include="RestSharp.Serializers.SystemTextJson" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="TpLink.UnitTest" />
+  </ItemGroup>
 </Project>
