@@ -1,7 +1,6 @@
 ﻿using RestSharp;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -9,6 +8,7 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 using TpLink.Api.Helpers;
 using TpLink.Api.Models;
@@ -22,7 +22,7 @@ namespace TpLink.Api
 
         public EndpointAuth EndpointAuth { get; }
 
-        public TpLinkClient() : this("admin", "admin", "192.168.1.1")
+        public TpLinkClient() : this("admin", "admin", "http://192.168.1.1")
         {
         }
 
@@ -34,6 +34,12 @@ namespace TpLink.Api
         public TpLinkClient(EndpointAuth apiConnection)
         {
             EndpointAuth = apiConnection ?? throw new ArgumentNullException(nameof(apiConnection));
+
+            // RestClient needs an absolute URL; accept a bare host or IP as a convenience
+            if (!apiConnection.Endpoint.Contains("://", StringComparison.Ordinal))
+            {
+                apiConnection.Endpoint = $"http://{apiConnection.Endpoint}";
+            }
 
             _apiConnection = new RestClient(apiConnection.Endpoint)
             {
@@ -61,13 +67,12 @@ namespace TpLink.Api
             // default serializer options
             jsonOption = new JsonSerializerOptions
             {
-                IgnoreNullValues = true,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
                 PropertyNameCaseInsensitive = true,
                 WriteIndented = true,
                 AllowTrailingCommas = true,
                 ReadCommentHandling = JsonCommentHandling.Skip
-                // note: wont work when sending the request, since the request ain't sent as json! :(
-                //PropertyNamingPolicy = new TpLinkPropertyNamingPolicy(),
+                // note: a custom PropertyNamingPolicy would not help when sending, since requests are form posts, not json
             };
             // Ignore for now! tplink server returns wrong content-type
             //restClient.UseSystemTextJson(_option);
@@ -346,37 +351,45 @@ namespace TpLink.Api
         }
 
         /// <summary>
-        /// Find out which ip address is signed to the powerline.
+        /// Find out which ip address is assigned to the powerline by broadcasting a UDP discovery
+        /// message and waiting for the first adapter that answers.
         /// </summary>
+        /// <param name="timeout">How long to wait for an answer. Defaults to 5 seconds.</param>
         /// <returns>The ip address of the powerline</returns>
-        public static async Task<string> DiscoveryAsync()
+        /// <exception cref="TimeoutException">No adapter answered within <paramref name="timeout"/>.</exception>
+        public static async Task<string> DiscoveryAsync(TimeSpan? timeout = null)
         {
+            var wait = timeout ?? TimeSpan.FromSeconds(5);
+
             // note here 192.168.1.86 was the ip that powerline was using - this is dynamic can change
-            // wireshark filter: (ip.dst == 192.168.1.108 && ip.src == 192.168.1.86 ) || (ip.dst == 255.255.255.255) 
+            // wireshark filter: (ip.dst == 192.168.1.108 && ip.src == 192.168.1.86 ) || (ip.dst == 255.255.255.255)
             using var uc = new UdpClient(new IPEndPoint(IPAddress.Any, 61000))
             {
                 EnableBroadcast = true,
             };
 
-            //uc.Client.Bind(new IPEndPoint(IPAddress.Any, 61000));
-
-            // original data capture in wireshark (discover message in bytes)
-            var data = new byte[]
-            {
-                0x02, 0x03, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0xe8, 0x03, 0x12, 0x00, 0x75, 0x7c, 0xbe, 0x42, 0xdc, 0x81,
-                0x21, 0xf6, 0xe1, 0x5e, 0xff, 0xc0, 0xc4, 0x1e, 0x25, 0x96
-            };
-
+            // the binary discovery frame captured in wireshark is not needed; a plain text broadcast gets an answer
             var buffer = Encoding.UTF8.GetBytes("Where are you!");
 
             // note: i think this is not really safe, because if powerline was fast enough the receive won't be able to capture
             // see: https://stackoverflow.com/a/40617102/2766753 for more relaiable udp implementation
-            var count = await uc.SendAsync(buffer, buffer.Length, IPAddress.Broadcast.ToString(), 1040).ConfigureAwait(false);
-            UdpReceiveResult udpResponse = await uc.ReceiveAsync().ConfigureAwait(false);
+            await uc.SendAsync(buffer, buffer.Length, IPAddress.Broadcast.ToString(), 1040).ConfigureAwait(false);
 
-            // get the discovered ip addres of the powerline
-            return udpResponse.RemoteEndPoint.Address.ToString();
+            using var cts = new CancellationTokenSource(wait);
+            try
+            {
+                UdpReceiveResult udpResponse = await uc.ReceiveAsync(cts.Token).ConfigureAwait(false);
+
+                // get the discovered ip addres of the powerline
+                return udpResponse.RemoteEndPoint.Address.ToString();
+            }
+            catch (OperationCanceledException)
+            {
+                throw new TimeoutException(
+                    $"No powerline adapter answered the discovery broadcast within {wait.TotalSeconds:0.#} seconds. " +
+                    "Discovery does not work through a VPN and needs inbound UDP port 61000 open; " +
+                    "alternatively pass the adapter's IP to the TpLinkClient constructor.");
+            }
         }
 
         public Task<object> AddNewUserAsync()
@@ -387,28 +400,36 @@ namespace TpLink.Api
         public async Task<TpLinkResponse<ICollection<WifiSchedule>>> AddNewWifiScheduleAsync(WifiSchedule wifiSchedule)
         {
             // validation
+            if (wifiSchedule is null)
+            {
+                throw new ArgumentNullException(nameof(wifiSchedule));
+            }
+
             if (wifiSchedule.StartTime < 0 || wifiSchedule.StartTime > 24)
             {
-                throw new InvalidEnumArgumentException(nameof(WifiSchedule.StartTime));
+                throw new ArgumentOutOfRangeException(nameof(wifiSchedule), wifiSchedule.StartTime,
+                    $"{nameof(WifiSchedule.StartTime)} must be between 0 and 24.");
             }
 
             if (wifiSchedule.EndTime < 0 || wifiSchedule.EndTime > 24)
             {
-                throw new InvalidEnumArgumentException(nameof(WifiSchedule.EndTime));
+                throw new ArgumentOutOfRangeException(nameof(wifiSchedule), wifiSchedule.EndTime,
+                    $"{nameof(WifiSchedule.EndTime)} must be between 0 and 24.");
             }
 
             if (wifiSchedule.StartTime >= wifiSchedule.EndTime)
             {
-                throw new InvalidEnumArgumentException(nameof(WifiSchedule.StartTime));
+                throw new ArgumentException(
+                    $"{nameof(WifiSchedule.StartTime)} must be earlier than {nameof(WifiSchedule.EndTime)}.",
+                    nameof(wifiSchedule));
             }
 
             var jsonOptions = new JsonSerializerOptions
             {
                 WriteIndented = false,
-                IgnoreNullValues = true,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
                 AllowTrailingCommas = true,
                 PropertyNameCaseInsensitive = true,
-                //PropertyNamingPolicy = new PropertyNamingPolicy.TpLinkPropertyNamingPolicy
             };
 
             // JsonConverterFactory
@@ -454,36 +475,5 @@ namespace TpLink.Api
         {
             throw new NotImplementedException();
         }
-
-        // note: copied code from my networking->UDPTesting project example
-        //public static IPAddress GetIpAddress()
-        //{
-        //    const NetworkInterfaceType interfaceType = true
-        //        ? NetworkInterfaceType.Wireless80211
-        //        : NetworkInterfaceType.Ethernet; /*| NetworkInterfaceType.FastEthernetFx |
-        //          NetworkInterfaceType.GigabitEthernet;*/ // "|" won't work because the type doesn't use [Flag] attribuite
-
-        //    IPAddress found = default;
-
-        //    // NOTE: ALWAYS SPECIFY THE INTERFACE IF THERE IS MORE THAN ON CONNECTION (LAN-WIFI)
-        //    foreach (var @interface in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
-        //    {
-        //        Console.WriteLine(@interface.Name);
-        //        if (@interface.NetworkInterfaceType == interfaceType)
-        //        {
-        //            // could be ipv4 / ipv6
-        //            var address = @interface.GetIPProperties().UnicastAddresses
-        //                .First(ip => ip.Address.AddressFamily == AddressFamily.InterNetwork).Address;
-        //            // note: if you are using virtual box this could be it's address so make sure more
-        //            // filter is done...
-        //            Console.WriteLine(address.ToString());
-        //            found = address;
-        //        }
-        //    }
-
-        //    var ipAddress = Dns.GetHostEntry(Dns.GetHostName()).AddressList[2];
-        //    Console.WriteLine(ipAddress);
-        //    return ipAddress;
-        //}
     }
 }

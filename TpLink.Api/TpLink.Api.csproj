@@ -2,8 +2,6 @@
   <PropertyGroup>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" />
     <PackageReference Include="RestSharp" />
-    <PackageReference Include="RestSharp.Serializers.SystemTextJson" />
   </ItemGroup>
 </Project>

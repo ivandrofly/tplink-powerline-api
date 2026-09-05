@@ -1,5 +1,6 @@
 using System;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using TpLink.Api;
 using TpLink.Api.Helpers;
@@ -33,7 +34,7 @@ namespace TpLink.UnitTest
             var jsonOptions = new JsonSerializerOptions
             {
                 WriteIndented = false,
-                IgnoreNullValues = true,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
                 AllowTrailingCommas = true,
                 PropertyNameCaseInsensitive = true,
             };
