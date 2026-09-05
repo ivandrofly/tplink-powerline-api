@@ -97,16 +97,16 @@ All members of `ITpLinkClient`, with their status on the TL-WPA8630P:
 | `GetPowerlineDevicesStatusAsync()` | Works | Powerline peers with RX/TX rate. |
 | `GetSystemLogsAsync()` | Works | Device system log. |
 | `GetGuest2GhzAsync()` / `GetGuest5GhzAsync()` | Works | Reads guest network settings. |
-| `ChangeWireless5GStatusAsync(bool)` | Works | Turns the 5 GHz radio on or off. |
-| `ChangeWireless2GStatusAsync(bool)` | Partial | Posts the change, but returns `null` instead of the updated model. |
+| `ChangeWireless5GStatusAsync(bool)` | Works | Turns the 5 GHz radio on or off. Reads the current settings first and posts them back unchanged. |
+| `ChangeWireless2GStatusAsync(bool)` | Works | Same as above for the 2.4 GHz radio. |
 | `RebootAsync()` | Works | Fire-and-forget; always returns `Data = true`. |
 | `AddNewWifiScheduleAsync(WifiSchedule)` | Works | Inserts the rule at index 0. |
 | `WifiMoveAsync(bool)` | Not working | The request matches the browser's but the device does not apply it. |
 | `AddNewUserAsync()` | Not implemented | Throws `NotImplementedException`. |
 | `AddMacFilterAsync` / `RemoveMacFilterAsync` / `ChangeMacFilterStateAsync` / `GetMacFilterGetDevicesAsync` | Not implemented | Throw `NotImplementedException`. |
 
-`TpLinkClient` also exposes `GetWirelessBand2GAsync()` (reads the 2.4 GHz settings) and the static
-`DiscoveryAsync()`, which are not on the interface.
+`TpLinkClient` also exposes `GetWirelessBand2GAsync()` and `GetWirelessBand5GAsync()` (read the radio settings)
+and the static `DiscoveryAsync()`, which are not on the interface.
 
 ## Discovery
 

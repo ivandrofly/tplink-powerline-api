@@ -26,7 +26,7 @@ Running either host app needs a live adapter on the LAN plus two user-scoped env
 
 **Auth is a cookie, not a header.** `StringUtils.GetAuthorization` builds `Basic {login}:{md5(password)}`, URL-escapes it, and `TpLinkClient` sets it as a default `Cookie: Authorization=...` header on the shared `RestClient`. The unit test pins this exact string, so changing hashing or escaping breaks it.
 
-**Every call is a form post.** Endpoints look like `admin/wireless?form=wireless_2g` with `operation=load|read|write|insert` and other fields as `application/x-www-form-urlencoded` parameters via `RestRequest.AddParameter(..., ParameterType.GetOrPost)`. Nothing is sent as a JSON body, so `JsonPropertyName` attributes and `TpLinkPropertyNamingPolicy` only affect deserialization. When writing settings back (see `ChangeWireless2GStatusAsync`), the client reads the current model, mutates it, then reflects over its properties to emit each one as a form field using the `JsonPropertyName` name.
+**Every call is a form post.** Endpoints look like `admin/wireless?form=wireless_2g` with `operation=load|read|write|insert` and other fields as `application/x-www-form-urlencoded` parameters via `RestRequest.AddParameter(..., ParameterType.GetOrPost)`. Nothing is sent as a JSON body, so `JsonPropertyName` attributes and `TpLinkPropertyNamingPolicy` only affect deserialization. When writing settings back (see the private `ChangeWirelessStatusAsync`, shared by the 2.4 GHz and 5 GHz toggles), the client reads the current model, mutates it, then reflects over its properties to emit each non-null one as a form field using the `JsonPropertyName` name. Never post hard-coded values for fields the device already reports; that silently resets user settings.
 
 **Deserialization is manual.** The adapter returns JSON with `Content-Type: text/html`, which makes RestSharp pick the wrong serializer. Every method therefore calls `_apiConnection.ExecuteAsync(req)` and runs `System.Text.Json.JsonSerializer.Deserialize<T>(response.Content, jsonOption)` itself. Keep that pattern rather than switching to `ExecuteAsync<T>`.
 
@@ -36,4 +36,4 @@ Running either host app needs a live adapter on the LAN plus two user-scoped env
 
 ## State of the code
 
-Several `ITpLinkClient` members throw `NotImplementedException` (user and MAC-filter operations). `WifiMoveAsync` is marked not working. `ChangeWireless2GStatusAsync` returns null after posting. Many methods contain commented-out experiments; treat them as notes on what was tried against the device, not dead code to clean up blindly.
+Several `ITpLinkClient` members throw `NotImplementedException` (user and MAC-filter operations). `WifiMoveAsync` is marked not working. Many methods contain commented-out experiments; treat them as notes on what was tried against the device, not dead code to clean up blindly.
