@@ -7,11 +7,31 @@
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/TpLinkDataRate/TpLink.Service.csproj",
+                "${workspaceFolder}/tplink-powerline.slnx",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"
             ],
-            "problemMatcher": "$msCompile"
+            "problemMatcher": "$msCompile",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "test",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "test",
+                "${workspaceFolder}/tplink-powerline.slnx",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            }
         },
         {
             "label": "publish",
@@ -32,6 +52,7 @@
             "args": [
                 "watch",
                 "run",
+                "--project",
                 "${workspaceFolder}/TpLinkDataRate/TpLink.Service.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"

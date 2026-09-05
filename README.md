@@ -23,7 +23,8 @@ for details and pointers to implementations of the encrypted handshake.
 
 ## Requirements
 
-- .NET SDK **9.0.200 or newer** to build (the solution file is the XML `.slnx` format). Projects target `net8.0`.
+- .NET SDK **9.0.200 or newer** to build (the solution file is the XML `.slnx` format). `global.json` pins the
+  9.0 feature band, so any 9.0.2xx+ SDK is picked up; edit it to build with a newer major. Projects target `net8.0`.
 - The adapter on the same LAN as the machine running the code, reachable over HTTP.
 - The adapter's web-admin login and password.
 
@@ -32,10 +33,12 @@ for details and pointers to implementations of the encrypted handshake.
 ```
 dotnet build
 dotnet test
-dotnet test --filter "FullyQualifiedName~StringUtilsTest.WifiScheduleTest"
+dotnet test --filter "FullyQualifiedName~WifiScheduleTest"
 ```
 
-CI (`.github/workflows/dotnet.yml`) runs restore, build and test on the .NET 9.0.x SDK.
+Warnings are errors (`TreatWarningsAsErrors` in `Directory.Build.props`), so keep the build clean.
+CI (`.github/workflows/dotnet.yml`) runs restore, a Release build and the tests on the .NET 9.0.x SDK, and
+uploads the `.trx` results and code coverage as a workflow artifact.
 
 ## Quick start
 
@@ -150,9 +153,9 @@ and open a new terminal, or set them for the current session with `$env:tplink_p
 On Linux or macOS use `export tplink_powerline_login=admin`. Both apps fail fast with a message naming the
 configuration keys and variables when the login or password is missing.
 
-- **`Client.Console`**: `dotnet run --project Client.Console`. Discovers the adapter, then runs whichever
-  command is uncommented in `Client.Console/Program.cs` (turn both radios on or off, reboot, list connected clients).
-  Edit `Program.cs` to pick a different action.
+- **`Client.Console`**: `dotnet run --project Client.Console -- clients`. Connects to the adapter, then runs the
+  command given on the command line: `on` and `off` (both radios), `reboot`, `clients` (list connected Wi-Fi
+  clients) or `batch` (list, reboot, wait a minute, list again). Run it without arguments for the usage text.
 - **`TpLink.Service`**: `dotnet run --project TpLinkDataRate/TpLink.Service.csproj`. A generic-host
   `BackgroundService` that connects to the adapter and logs the link rate of every powerline peer every
   `Worker:PollInterval` (5 seconds by default, see `appsettings.json`). It also binds the `TpLink` configuration

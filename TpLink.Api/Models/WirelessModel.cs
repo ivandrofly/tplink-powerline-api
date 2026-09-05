@@ -26,7 +26,7 @@ namespace TpLink.Api.Models
         [JsonPropertyName("wep_key3")]
         public string WepKey3 { get; set; }
         [JsonPropertyName("wep_key4")]
-        public string WebKey4 { get; set; }
+        public string WepKey4 { get; set; }
         [JsonPropertyName("wep_type1")]
         public string WepType1 { get; set; }
         [JsonPropertyName("wep_type2")]

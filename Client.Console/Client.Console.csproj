@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <!-- "Client.Console" as a namespace shadows System.Console in every file -->
+    <RootNamespace>TpLink.Cli</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\TpLink.Api\TpLink.Api.csproj" />
