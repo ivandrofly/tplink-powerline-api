@@ -1,11 +1,10 @@
-﻿using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace TpLink.Api.Models
+namespace TpLink.Api.Models;
+
+/// <summary>The wireless client list is the one response with an extra top-level field.</summary>
+public class TpLinkClientData : TpLinkResponse<List<Client>>
 {
-    public class TpLinkClientData : TpLinkResponse<List<Client>>, IResponseModel<List<Client>>
-    {
-        [JsonPropertyName("max_rules")]
-        public string MaxRules { get; set; }
-    }
+    [JsonPropertyName("max_rules")]
+    public string? MaxRules { get; set; }
 }

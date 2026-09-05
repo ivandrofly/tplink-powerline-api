@@ -1,16 +1,14 @@
-﻿namespace TpLink.Api.Models
+namespace TpLink.Api.Models;
+
+/// <summary>One line of the device's system log (admin/syslog?form=log).</summary>
+public class SystemLog
 {
-    public class SystemLog
-    {
-        // todo: add value converter for this. for now i will use it as string
-        //public TimeSpan Time { get; set; }
-        public string Time { get; set; }
-        public string Type { get; set; }
-        public string Level { get; set; }
+    /// <summary>Kept as the device's text; it is not a stable timestamp format.</summary>
+    public string? Time { get; set; }
 
-        // matching is case-insensitive, so no JsonPropertyName is needed here
-        public string Content { get; set; }
+    public string? Type { get; set; }
+    public string? Level { get; set; }
+    public string? Content { get; set; }
 
-        public override string ToString() => $"time: {Time}, type: {Type}, level: {Level}, content: {Content}";
-    }
+    public override string ToString() => $"time: {Time}, type: {Type}, level: {Level}, content: {Content}";
 }
