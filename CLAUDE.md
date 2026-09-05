@@ -8,17 +8,17 @@ A .NET 8 client library (`TpLink.Api`) that drives the web-admin interface of a 
 
 ## Commands
 
-Two solution files exist (`tplink-powerline.sln` and `tplink-powerline.slnx`), so a bare `dotnet build` fails with MSB1011 on SDKs that understand `.slnx`. Always name the solution or project.
+The solution is `tplink-powerline.slnx` (the XML solution format), so the .NET SDK must be 9.0.200 or newer to build it. Bare `dotnet build` and `dotnet test` from the repo root work.
 
 ```
-dotnet build tplink-powerline.sln
-dotnet test tplink-powerline.sln
-dotnet test tplink-powerline.sln --filter "FullyQualifiedName~StringUtilsTest.WifiScheduleTest"
+dotnet build
+dotnet test
+dotnet test --filter "FullyQualifiedName~StringUtilsTest.WifiScheduleTest"
 dotnet run --project Client.Console
 dotnet run --project TpLinkDataRate/TpLink.Service.csproj
 ```
 
-CI (`.github/workflows/dotnet.yml`) runs restore, build, and test on .NET 8.0.x. `Directory.Build.props` pins `net8.0` for every project; `Directory.Packages.props` does central package version management, so add new packages there and reference them without a `Version` in the csproj.
+CI (`.github/workflows/dotnet.yml`) runs restore, build, and test on the .NET 9.0.x SDK; projects still target `net8.0`. `Directory.Build.props` pins `net8.0` for every project; `Directory.Packages.props` does central package version management, so add new packages there and reference them without a `Version` in the csproj.
 
 Running either host app needs a live adapter on the LAN plus two user-scoped environment variables: `tplink_powerline_login` and `tplink_powerline_pwd`. The apps locate the adapter with a UDP broadcast (`TpLinkClient.DiscoveryAsync`), which fails through a VPN or when several adapters are up. Requests also fail while the adapter's web manager is open in a browser, because the device allows one session.
 
