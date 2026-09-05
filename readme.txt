@@ -1,1 +1,0 @@
-if request is failing make sure you don't have web manager open
