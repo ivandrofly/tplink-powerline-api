@@ -1,87 +1,74 @@
 using System;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using TpLink.Api;
 
 namespace TpLink.Service
 {
+    /// <summary>
+    /// Connects to the powerline adapter (discovering it when no endpoint is configured) and logs the link rate
+    /// of every powerline peer on a fixed interval until the host stops.
+    /// </summary>
     public class Worker : BackgroundService
     {
         private readonly ILogger<Worker> _logger;
-        private readonly ITpLinkClient _tpLinkClient;
+        private readonly TpLinkOptions _tpLinkOptions;
+        private readonly WorkerOptions _workerOptions;
 
-        public Worker(ILogger<Worker> logger, ITpLinkClient tpLinkClient)
+        public Worker(ILogger<Worker> logger, IOptions<TpLinkOptions> tpLinkOptions, IOptions<WorkerOptions> workerOptions)
         {
             _logger = logger;
-            _tpLinkClient = tpLinkClient;
+            _tpLinkOptions = tpLinkOptions.Value;
+            _workerOptions = workerOptions.Value;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            //_logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
-            while (!stoppingToken.IsCancellationRequested)
+            try
             {
-                // the default jsonserializer (newtownsoft) is faillign to handle tplink direclty
-                // var response = await restClient.ExecutePostAsync<TpLinkData>(req);
-                // tips: using system serializer with restsharp isn't working aswell
-                // workaround: use system/.net core default serializer manually
-                // look like i'm using the wrong attribute in properties: system json instead of restsharp's https://github.com/restsharp/RestSharp/wiki/Serialization
-
-                //var response = await restClient.ExecuteTaskAsync/*<TpLinkData<SystemLog>>*/(sysLogRequest);
-                //var data = System.Text.Json.JsonSerializer.Deserialize<TpLinkData<SystemLog>>(response.Content, jsonOptions);
-                //var response = await restClient.ExecuteAsync<object>(powerLineStatusRequest);
-                //var data = System.Text.Json.JsonSerializer.Deserialize<TpLinkClientData>(response.Content, jsonOptions);
-                //_logger.LogInformation(data.Datas.Last().ToString());
-
-                // test wifi-move
-                // var res2 = await _tpLinkClient.WifiMoveAsync(true);
-                // turn off radios for 5ghz network
-
-                var res = await _tpLinkClient.ChangeWireless5GStatusAsync(true);
-
-                var response = await _tpLinkClient.GetPowerlineDevicesStatusAsync();
-                if (response.Success && response.Data != null)
+                if (string.IsNullOrWhiteSpace(_tpLinkOptions.Endpoint))
                 {
-                    Console.WriteLine($"password: {response.Data.FirstOrDefault()?.Password}");
-                    Console.WriteLine("operation success");
-                }
-                else
-                {
-                    Console.WriteLine();
-                    Console.WriteLine("operation failed (make sure you don't have powerline openned in browser)");
+                    _logger.LogInformation("Discovering the powerline adapter (disable any VPN first)");
                 }
 
-                Console.WriteLine("done ");
-                // test reboot
-                // note: the turn off is scheduled, powerline won't turn the wi-fi one by default
-                //await _tpLinkClient.RebootAsync();
+                using var client = await TpLinkClient.CreateAsync(_tpLinkOptions, stoppingToken);
+                _logger.LogInformation("Polling {Endpoint} every {Interval}", client.Endpoint, _workerOptions.PollInterval);
 
-                // test system log
-                //_logger.LogInformation(result.Data.FirstOrDefault().DeviceName);
-                //_logger.LogInformation("reading system log");
-                //foreach (var item in (await _tpLinkClient.GetSystemLogsAsync()).Data)
-                //{
-                //    Console.WriteLine(item.ToString());
-                //}
-
-                await Task.Delay(1000 * 5, stoppingToken);
-                Console.Clear();
-                break;
+                while (!stoppingToken.IsCancellationRequested)
+                {
+                    await PollAsync(client, stoppingToken);
+                    await Task.Delay(_workerOptions.PollInterval, stoppingToken);
+                }
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                // host shutdown
             }
         }
 
-        private async Task<int> ShowCLients()
+        private async Task PollAsync(ITpLinkClient client, CancellationToken cancellationToken)
         {
-            var tpLinkClients = await _tpLinkClient.GetCountConnectedClientsAsync();
-            foreach (var client in (await _tpLinkClient.GetClientsAsync()).Data)
+            try
             {
-                _logger.LogInformation(client.ToString());
-            }
-            return tpLinkClients;
-        }
+                var status = await client.GetPowerlineDevicesStatusAsync(cancellationToken);
+                if (!status.Success || status.Data == null)
+                {
+                    _logger.LogWarning("The adapter rejected the request; close its web manager in the browser and it will recover");
+                    return;
+                }
 
+                foreach (var device in status.Data)
+                {
+                    _logger.LogInformation("{Mac} {Status}: rx {RxRate}, tx {TxRate}", device.Mac, device.Status, device.RXRate, device.TXRate);
+                }
+            }
+            catch (TpLinkException ex)
+            {
+                _logger.LogError(ex, "Request to the adapter failed");
+            }
+        }
     }
 }

@@ -1,14 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System;
 using System.Threading.Tasks;
 using Client.Console.Commands;
 using TpLink.Api;
 
 namespace Client.Console
 {
-    public class Invoker
+    public class Invoker : IDisposable
     {
         private readonly ICommand turnOnCommand;
         private readonly ICommand turnOffCommand;
@@ -18,75 +15,63 @@ namespace Client.Console
 
         public Invoker()
         {
-            //System.Console.WriteLine("Discovering...");
-            //var commands = new List<ICommand> {new DisplayConnectedCommand(), new TurnOffSignal()};
             turnOnCommand = new TurnOnSignal();
             turnOffCommand = new TurnOffSignal();
             rebootCommand = new RebootCommand();
             printCommand = new DisplayConnectedCommand();
-
-            //DiscoverAsync().GetAwaiter().GetResult();
         }
 
+        /// <summary>
+        /// Read the credentials (and optional endpoint) from the tplink_powerline_* environment variables and
+        /// discover the adapter on the LAN unless an endpoint was given.
+        /// </summary>
         public async Task DiscoverAsync()
         {
-            // read the process environment: user-scoped variables (setx) are inherited on Windows, and this is the
-            // only scope that exists on Linux/macOS, where EnvironmentVariableTarget.User always returns null
-            string login = Environment.GetEnvironmentVariable("tplink_powerline_login");
-            string pwd = Environment.GetEnvironmentVariable("tplink_powerline_pwd");
-            if (string.IsNullOrWhiteSpace(login) || string.IsNullOrWhiteSpace(pwd))
+            var options = new TpLinkOptions().ApplyEnvironmentFallback();
+            if (string.IsNullOrWhiteSpace(options.Endpoint))
             {
-                throw new InvalidOperationException(
-                    "Set the tplink_powerline_login and tplink_powerline_pwd environment variables " +
-                    "(setx on Windows, export on Linux/macOS) and open a new terminal.");
+                System.Console.WriteLine("Discovering the powerline adapter...");
             }
 
-            string endpoint = await TpLinkClient.DiscoveryAsync();
-            powerLine = new TpLinkClient(login, pwd, $"http://{endpoint}");
+            powerLine = await TpLinkClient.CreateAsync(options);
+            System.Console.WriteLine($"Using adapter at {powerLine.Endpoint}");
         }
 
         public Task TurnOn()
         {
             System.Console.WriteLine("turning on 5ghz and 2.4ghz");
-            // Task.WhenAll(new[]
-            // {
-            //     turnOnCommand.Execute(powerLine),
-            //     
-            // });
-            return turnOnCommand.Execute(powerLine);
+            return turnOnCommand.Execute(Client);
         }
 
         public Task TurnOff()
         {
             System.Console.WriteLine("turning off 5ghz and 2.4ghz");
-            return turnOffCommand.Execute(powerLine);
+            return turnOffCommand.Execute(Client);
         }
 
         public Task Reboot()
         {
             System.Console.WriteLine("rebooting..");
-            return rebootCommand.Execute(powerLine);
+            return rebootCommand.Execute(Client);
         }
 
         public async Task RunBatch()
         {
             System.Console.WriteLine("running batch commands");
-            await printCommand.Execute(powerLine);
-            await rebootCommand.Execute(powerLine);
+            await printCommand.Execute(Client);
+            await rebootCommand.Execute(Client);
             await Task.Delay(1000 * 60);
-            await printCommand.Execute(powerLine);
+            await printCommand.Execute(Client);
         }
 
         public Task DisplayClient()
         {
-            return printCommand.Execute(powerLine);
+            return printCommand.Execute(Client);
         }
 
+        public void Dispose() => powerLine?.Dispose();
 
-        // await Task.Delay(1000 * 60);
-        //commands.ForEach(c => c.Execute(powerLine));
-        //await Task.Delay(1000 * 60);
-        //var turnOnSign = new TurnOnSignal();
-        //await turnOnSign.Execute(powerLine);
+        private ITpLinkClient Client =>
+            powerLine ?? throw new InvalidOperationException($"Call {nameof(DiscoverAsync)} before running a command.");
     }
 }
