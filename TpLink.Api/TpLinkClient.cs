@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
@@ -22,7 +21,7 @@ namespace TpLink.Api
 
         public EndpointAuth EndpointAuth { get; }
 
-        public TpLinkClient() : this("admin", "admin", "192.168.1.1")
+        public TpLinkClient() : this("admin", "admin", "http://192.168.1.1")
         {
         }
 
@@ -150,142 +149,71 @@ namespace TpLink.Api
             return clients.Data.Count;
         }
 
-        // TODO: remove - use same logic as 5ghz one
-        public async Task<TpLinkResponse<WirelessModel>> GetWirelessBand2GAsync()
+        /// <summary>
+        /// Read the current 2.4 GHz wireless settings (admin/wireless?form=wireless_2g, operation=read).
+        /// </summary>
+        public Task<TpLinkResponse<WirelessModel>> GetWirelessBand2GAsync() => GetWirelessBandAsync("wireless_2g");
+
+        /// <summary>
+        /// Read the current 5 GHz wireless settings (admin/wireless?form=wireless_5g, operation=read).
+        /// </summary>
+        public Task<TpLinkResponse<WirelessModel>> GetWirelessBand5GAsync() => GetWirelessBandAsync("wireless_5g");
+
+        private async Task<TpLinkResponse<WirelessModel>> GetWirelessBandAsync(string form)
         {
             var req = new RestRequest("admin/wireless", Method.Post);
-            req.AddQueryParameter("form", "wireless_2g");
+            req.AddQueryParameter("form", form);
             req.AddParameter("operation", "read", ParameterType.GetOrPost);
             var res = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
 
-            //var jsonObj = new
-            //{
-            //    name = "ivandro",
-            //    age = 102,
-            //    order = new object[]
-            //    {
-
-            //    }
-            //};
-
-            // NOTE: THIS SEEMS TO BE POSSIBLE WITH NETWORNSOFT JSON JProperty
-            //var jdoc = JsonDocument.Parse(res.Content);
-
-            //var jdoc = JObject.Parse(res.Content);
-            //var r = jdoc.SelectToken("data");
-
-            //jdoc.Root.
-
-            //var jp = jdoc.RootElement.GetProperty("data");
-
-            //req.AddJsonBody(new { name = new { data = ""} });
-
-            //if (jp.GetProperty("enable").GetString().Equals("off"))
-            //{
-            //    jp.GetProperty("enable");
-            //}
-            //else
-            //{
-            //}
-
-            //jdoc.RootElement.GetProperty("enable").
-
-            // todo: still string
-            //dynamic instance = JsonSerializer.Deserialize<dynamic>(res.Content);
-            //bool success = (bool)instance["success"];
-
+            // note: earlier experiments that poked at "data.enable" directly (Newtonsoft JObject.SelectToken,
+            // JsonDocument.GetProperty, Deserialize<dynamic>) were dropped in favour of deserializing the whole model.
             return JsonSerializer.Deserialize<TpLinkResponse<WirelessModel>>(res.Content, jsonOption);
         }
 
-        public async Task<TpLinkResponse<WirelessModel>> ChangeWireless2GStatusAsync(bool enabled)
+        public Task<TpLinkResponse<WirelessModel>> ChangeWireless2GStatusAsync(bool enabled) => ChangeWirelessStatusAsync("wireless_2g", enabled);
+
+        public Task<TpLinkResponse<WirelessModel>> ChangeWireless5GStatusAsync(bool enabled) => ChangeWirelessStatusAsync("wireless_5g", enabled);
+
+        /// <summary>
+        /// Turn a radio on or off without touching any other setting: read the band's current settings,
+        /// flip <c>enable</c>, and post the whole model back (operation=write), exactly as the web UI does.
+        /// </summary>
+        /// <remarks>
+        /// The previous 5 GHz implementation only read ssid/psk_key/encryption (from admin/wlan_status) and
+        /// hard-coded hidden=off, psk_version=auto, psk_cipher=auto, hwmode=a, htmode=80, channel=auto and
+        /// txpower=low, so every toggle silently reset a hidden SSID, a fixed channel or the transmit power.
+        /// </remarks>
+        private async Task<TpLinkResponse<WirelessModel>> ChangeWirelessStatusAsync(string form, bool enabled)
         {
-            var tpLinkDataWM = await GetWirelessBand2GAsync();
+            var current = await GetWirelessBandAsync(form).ConfigureAwait(false);
+            if (current?.Data == null)
+            {
+                // the device refused the read (typically because the web manager is open in a browser);
+                // hand that envelope back so the caller sees Success == false instead of a NullReferenceException
+                return current;
+            }
+
+            current.Data.Enable = enabled ? "on" : "off";
+
             var req = new RestRequest("admin/wireless", Method.Post);
-            req.AddQueryParameter("form", "wireless_2g");
-            //req.AddParameter("enable", enabled ? "on" : "off", ParameterType.GetOrPost);
+            req.AddQueryParameter("form", form);
             req.AddParameter("operation", "write", ParameterType.GetOrPost);
 
-            // change the data 
-            tpLinkDataWM.Data.Enable = enabled ? "on" : "off";
-
-            // map the prop name and value to a dictionary
-            Dictionary<string, string> dictionary = tpLinkDataWM.Data.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .ToDictionary(prop =>
+            // emit every property the device sent us as a form field, named after its JsonPropertyName
+            // (or the lower-cased property name). Properties the device did not send are skipped, so the
+            // 5 GHz write does not carry the 2.4 GHz-only "wireless_2g_disabled*" fields.
+            // note: req.AddObject(model) throws for this shape, hence the explicit loop.
+            foreach (var prop in typeof(WirelessModel).GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (prop.GetValue(current.Data) is not string value)
                 {
-                    var jsonProp = prop.GetCustomAttribute<JsonPropertyNameAttribute>(true);
-                    return jsonProp == null ? prop.Name.ToLowerInvariant() : jsonProp.Name;
-                }, prop => (string)prop.GetValue(tpLinkDataWM.Data));
+                    continue;
+                }
 
-            // trying to add dictionary with "AddObject" throws exception
-            // req.AddObject(dictionary);
-            foreach (KeyValuePair<string, string> kvp in dictionary)
-            {
-                req.AddParameter(kvp.Key, kvp.Value, ParameterType.GetOrPost); // working 
-                //req.AddParameter(kvp.Key, kvp.Value);
+                var jsonProp = prop.GetCustomAttribute<JsonPropertyNameAttribute>(true);
+                req.AddParameter(jsonProp?.Name ?? prop.Name.ToLowerInvariant(), value, ParameterType.GetOrPost);
             }
-
-            // uncommnet line 200 (goto)
-            //required_only:
-            //    req.AddParameter("enable", enabled ? "on" : "off", ParameterType.GetOrPost);
-
-            // workaround:
-            // add by one and convert the prop-name?
-            // build a method to handle it all?
-
-            // TODO: CONVERT THE CASING TO "name_name", before sending the post request
-            // invoke some type os method to return parameter with corret casing
-
-            await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
-            return null;
-        }
-
-        public async Task<TpLinkResponse<WirelessModel>> ChangeWireless5GStatusAsync(bool enabled)
-        {
-            // send request to retrive the currnet wifi password
-            var reqStatus = new RestRequest("admin/wlan_status", Method.Post);
-            reqStatus.AddParameter("operation", "read", ParameterType.GetOrPost);
-            var resStatus = await _apiConnection.ExecuteAsync(reqStatus).ConfigureAwait(false);
-
-            // operation failed
-            if (resStatus.IsSuccessful == false)
-            {
-                return null;
-            }
-
-            var jdoc = JsonDocument.Parse(resStatus.Content, new JsonDocumentOptions
-            {
-                AllowTrailingCommas = true,
-                CommentHandling = JsonCommentHandling.Skip,
-            });
-
-            // get pre-shared key for 5ghz network
-            string pskKey = jdoc.RootElement
-                .GetProperty("data")
-                .GetProperty("wireless_5g_pwd").GetString();
-
-            string ssid5ghz = jdoc.RootElement
-                .GetProperty("data")
-                .GetProperty("wireless_5g_ssid").GetString();
-
-            string encryption = jdoc.RootElement
-                .GetProperty("data")
-                .GetProperty("wireless_5g_encryption").GetString();
-
-            // build request to update 5ghz wireless
-            var req = new RestRequest("admin/wireless", Method.Post);
-            req.AddQueryParameter("form", "wireless_5g");
-            req.AddParameter("operation", "write", ParameterType.GetOrPost);
-            req.AddParameter("enable", enabled ? "on" : "off", ParameterType.GetOrPost);
-            req.AddParameter("ssid", ssid5ghz, ParameterType.GetOrPost);
-            req.AddParameter("hidden", "off", ParameterType.GetOrPost);
-            req.AddParameter("psk_key", pskKey, ParameterType.GetOrPost);
-            req.AddParameter("encryption", encryption, ParameterType.GetOrPost);
-            req.AddParameter("psk_version", "auto", ParameterType.GetOrPost);
-            req.AddParameter("psk_cipher", "auto", ParameterType.GetOrPost);
-            req.AddParameter("hwmode", "a", ParameterType.GetOrPost);
-            req.AddParameter("htmode", "80", ParameterType.GetOrPost);
-            req.AddParameter("channel", "auto", ParameterType.GetOrPost);
-            req.AddParameter("txpower", "low", ParameterType.GetOrPost);
 
             var res = await _apiConnection.ExecuteAsync(req).ConfigureAwait(false);
             return JsonSerializer.Deserialize<TpLinkResponse<WirelessModel>>(res.Content, jsonOption);
