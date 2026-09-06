@@ -1,10 +1,8 @@
-using System.Threading.Tasks;
 using TpLink.Api;
 
-namespace TpLink.Cli.Commands
+namespace TpLink.Cli.Commands;
+
+public interface ICommand
 {
-    public interface ICommand
-    {
-        Task Execute(ITpLinkClient powerLine);
-    }
+    Task Execute(ITpLinkClient powerLine);
 }

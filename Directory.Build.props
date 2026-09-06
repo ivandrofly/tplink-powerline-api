@@ -6,6 +6,8 @@
         <Company>Ivandrofly</Company>
         <RepositoryUrl>https://github.com/ivandrofly/tplink-powerline-api</RepositoryUrl>
         <LangVersion>latest</LangVersion>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     </PropertyGroup>
 </Project>

@@ -1,7 +1,6 @@
-namespace TpLink.Api.Models
+namespace TpLink.Api.Models;
+
+public class WifiMove
 {
-    public class WifiMove
-    {
-        public int Enable { get; set; }
-    }
+    public int Enable { get; set; }
 }

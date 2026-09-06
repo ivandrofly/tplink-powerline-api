@@ -179,6 +179,8 @@ configuration keys and variables when the login or password is missing.
 Pull requests are welcome, especially reports and fixes for other TP-Link powerline models or for the
 encrypted firmware. The easiest way to add an operation is to capture the form post the web UI sends
 (browser dev tools or Wireshark) and replay it the way the existing methods in `TpLink.Api/TpLinkClient.cs` do.
+[docs/device-notes.md](docs/device-notes.md) collects what is known about each endpoint, the discovery
+packet, and the experiments that did not work.
 
 ## License
 
