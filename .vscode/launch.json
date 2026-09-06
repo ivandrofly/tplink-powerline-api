@@ -5,16 +5,28 @@
    "version": "0.2.0",
    "configurations": [
         {
-            "name": ".NET Core Launch (console)",
+            "name": "TpLink.Service",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
             // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/TpLinkDataRate/bin/Debug/netcoreapp3.1/TpLink.Service.dll",
+            "program": "${workspaceFolder}/TpLinkDataRate/bin/Debug/net8.0/TpLink.Service.dll",
             "args": [],
             "cwd": "${workspaceFolder}/TpLinkDataRate",
             // For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console
             "console": "internalConsole",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Client.Console (clients)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/Client.Console/bin/Debug/net8.0/Client.Console.dll",
+            // one of: on, off, reboot, clients, batch
+            "args": ["clients"],
+            "cwd": "${workspaceFolder}/Client.Console",
+            "console": "integratedTerminal",
             "stopAtEntry": false
         },
         {

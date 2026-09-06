@@ -3,7 +3,8 @@
 {
   "name": "C# (.NET)",
   // Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-  "image": "mcr.microsoft.com/devcontainers/dotnet:1-9.0-bookworm",
+  // Pinned so the container always carries a 9.0.2xx+ SDK, which the .slnx solution format and global.json need.
+  "image": "mcr.microsoft.com/devcontainers/dotnet:2.2.2-9.0-bookworm",
   // Features to add to the dev container. More info: https://containers.dev/features.
   // "features": {},
 

@@ -1,16 +1,16 @@
-﻿using System.Diagnostics;
+using System;
 using System.Threading.Tasks;
 using TpLink.Api;
 
-namespace Client.Console.Commands
+namespace TpLink.Cli.Commands
 {
     public class RebootCommand : ICommand
     {
         public async Task Execute(ITpLinkClient powerLine)
         {
-            Debug.WriteLine("Reboting..");
+            Console.WriteLine("Rebooting..");
             await powerLine.RebootAsync();
-            Debug.WriteLine("done reboot");
+            Console.WriteLine("Reboot requested; the adapter drops the connection while it restarts.");
         }
     }
 }

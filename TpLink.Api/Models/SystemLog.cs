@@ -8,8 +8,7 @@
         public string Type { get; set; }
         public string Level { get; set; }
 
-        // case incensitive is being used, this is no needed, but was required somehow
-        //[JsonPropertyName("content")] 
+        // matching is case-insensitive, so no JsonPropertyName is needed here
         public string Content { get; set; }
 
         public override string ToString() => $"time: {Time}, type: {Type}, level: {Level}, content: {Content}";

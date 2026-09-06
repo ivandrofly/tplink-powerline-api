@@ -1,7 +1,7 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using TpLink.Api;
 
-namespace Client.Console.Commands
+namespace TpLink.Cli.Commands
 {
     public interface ICommand
     {

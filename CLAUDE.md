@@ -13,12 +13,12 @@ The solution is `tplink-powerline.slnx` (the XML solution format), so the .NET S
 ```
 dotnet build
 dotnet test
-dotnet test --filter "FullyQualifiedName~StringUtilsTest.WifiScheduleTest"
-dotnet run --project Client.Console
+dotnet test --filter "FullyQualifiedName~WifiScheduleTest"
+dotnet run --project Client.Console -- clients      # on | off | reboot | clients | batch
 dotnet run --project TpLinkDataRate/TpLink.Service.csproj
 ```
 
-CI (`.github/workflows/dotnet.yml`) runs restore, build, and test on the .NET 9.0.x SDK; projects still target `net8.0`. `Directory.Build.props` pins `net8.0` for every project; `Directory.Packages.props` does central package version management, so add new packages there and reference them without a `Version` in the csproj.
+`global.json` pins the 9.0 feature band (`rollForward: latestFeature`, no prereleases), so local builds and CI use the same SDK line. CI (`.github/workflows/dotnet.yml`) runs restore, a Release build and the tests on the .NET 9.0.x SDK and uploads trx results plus coverage; projects still target `net8.0`. `Directory.Build.props` pins `net8.0` and sets `TreatWarningsAsErrors`, so a new compiler warning fails the build. `Directory.Packages.props` does central package version management, so add new packages there and reference them without a `Version` in the csproj.
 
 Running either host app needs a live adapter on the LAN plus credentials in a `TpLinkOptions`: the service binds the `TpLink` configuration section (appsettings, user-secrets, `TpLink__*` variables) and both apps fall back to the `tplink_powerline_login`, `tplink_powerline_pwd` and optional `tplink_powerline_endpoint` process environment variables via `TpLinkOptions.ApplyEnvironmentFallback` (`setx` or `$env:` on Windows, `export` elsewhere; never `EnvironmentVariableTarget.User`, which returns null on Linux/macOS). `TpLinkClient.CreateAsync(options)` locates the adapter with a UDP broadcast (`TpLinkClient.DiscoveryAsync`) when no endpoint is configured; discovery fails through a VPN or when several adapters are up. Requests also fail while the adapter's web manager is open in a browser, because the device allows one session.
 
@@ -36,7 +36,7 @@ Running either host app needs a live adapter on the LAN plus credentials in a `T
 
 **Response envelope.** Responses deserialize into `TpLinkResponse<TData>` with `Success`, `Timeout`, and `Data`. `TpLinkClientData` extends it with `max_rules` for the wireless client list. Device fields arrive as strings ("on"/"off", "1"/"0", numbers as text), so models keep `string` properties or use the converters in `TpLink.Api/Converters` (`StringBoolConverter` for on/off, `BoolToBitConvert` for 1/0, `IntToString`, `DaysEnumToCustomString`). The converters switch on `reader.TokenType` (shared logic in `JsonTokenParsing`) and tolerate JSON booleans, numbers and null; keep that when adding one, and add a theory case per token kind in `ConvertersTest`. `WifiSchedule` shows the full pattern: a `[Flags] Days` enum serialized as its byte value plus one derived `week_*` bit property per day.
 
-**Host apps.** `Client.Console` uses a command pattern (`ICommand.Execute(ITpLinkClient)` with `Invoker` wiring `TurnOnSignal`, `TurnOffSignal`, `RebootCommand`, `DisplayConnectedCommand`); `Program.cs` is top-level statements with commented-out calls toggled by hand. `TpLinkDataRate` is a generic-host `BackgroundService` (`Worker`) that binds `TpLinkOptions` and `WorkerOptions`, creates the client with `TpLinkClient.CreateAsync` inside `ExecuteAsync` (so discovery never blocks host start-up), and logs powerline link rates every `Worker:PollInterval`.
+**Host apps.** `Client.Console` (namespace `TpLink.Cli`, so `Console` is not shadowed) uses a command pattern (`ICommand.Execute(ITpLinkClient)` with `Invoker` wiring `TurnOnSignal`, `TurnOffSignal`, `RebootCommand`, `DisplayConnectedCommand`); `Program.cs` is top-level statements that dispatch on the single command-line argument and print usage otherwise. `TpLinkDataRate` is a generic-host `BackgroundService` (`Worker`) that binds `TpLinkOptions` and `WorkerOptions`, creates the client with `TpLinkClient.CreateAsync` inside `ExecuteAsync` (so discovery never blocks host start-up), and logs powerline link rates every `Worker:PollInterval`.
 
 ## State of the code
 

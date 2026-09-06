@@ -1,40 +1,43 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Net.NetworkInformation;
 using System.Threading.Tasks;
-using Client.Console;
-using Client.Console.Commands;
 using TpLink.Api;
-using TpLink.Api.Models;
+using TpLink.Cli;
 
-
-var invoker = new Invoker();
-
-// https://stackoverflow.com/questions/23048285/call-asynchronous-method-in-constructor
-await invoker.DiscoverAsync();
-//await invoker.DisplayClient();
-// await invoker.RunBatch();
-
-await invoker.TurnOn();
-//await invoker.Reboot();
-
-
-// note: make sure you request is not being tunneled by vpn
-//var result = NetworkInterface.GetAllNetworkInterfaces().First(ni => ni.OperationalStatus == OperationalStatus.Up && ni.NetworkInterfaceType == NetworkInterfaceType.Ethernet);
-//var ips = result.GetIPProperties();
-//var v4IPv4Statistics = result.GetIPv4Statistics();
-
-// to
-var wifiSchedule = new WifiSchedule
+// usage: dotnet run --project Client.Console -- <on|off|reboot|clients|batch>
+var actions = new Dictionary<string, (string Help, Func<Invoker, Task> Run)>(StringComparer.OrdinalIgnoreCase)
 {
-    Enable = true,
-    StartTime = 0,
-    EndTime = 1,
-    Days = Days.Monday | Days.Tuesday | Days.Wednesday | Days.Thursday | Days.Friday | Days.Saturday | Days.Sunday
+    ["on"] = ("turn the 2.4 GHz and 5 GHz radios on", invoker => invoker.TurnOn()),
+    ["off"] = ("turn the 2.4 GHz and 5 GHz radios off", invoker => invoker.TurnOff()),
+    ["reboot"] = ("reboot the adapter", invoker => invoker.Reboot()),
+    ["clients"] = ("list the wireless clients connected to the adapter", invoker => invoker.DisplayClient()),
+    ["batch"] = ("list clients, reboot, wait a minute, list clients again", invoker => invoker.RunBatch()),
 };
 
-//var response = await client.AddNewWifiScheduleAsync(wifiSchedule).ConfigureAwait(false);
-//Console.WriteLine(response);
-Console.ReadLine();
+if (args.Length != 1 || !actions.TryGetValue(args[0], out var action))
+{
+    Console.WriteLine("usage: dotnet run --project Client.Console -- <command>");
+    Console.WriteLine();
+    foreach (var (name, (help, _)) in actions)
+    {
+        Console.WriteLine($"  {name,-8} {help}");
+    }
+
+    Console.WriteLine();
+    Console.WriteLine($"Credentials come from the {TpLinkOptions.LoginVariable} and {TpLinkOptions.PasswordVariable} environment variables.");
+    Console.WriteLine($"Set {TpLinkOptions.EndpointVariable} (e.g. http://192.168.1.86) to skip discovery. Disable any VPN first.");
+    return 1;
+}
+
+try
+{
+    using var invoker = new Invoker();
+    await invoker.DiscoverAsync();
+    await action.Run(invoker);
+    return 0;
+}
+catch (Exception ex) when (ex is InvalidOperationException or TimeoutException or TpLinkException)
+{
+    Console.Error.WriteLine(ex.Message);
+    return 2;
+}

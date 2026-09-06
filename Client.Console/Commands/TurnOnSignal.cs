@@ -1,16 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System;
 using System.Threading.Tasks;
 using TpLink.Api;
 
-namespace Client.Console.Commands
+namespace TpLink.Cli.Commands
 {
-    class TurnOnSignal : ICommand
+    public class TurnOnSignal : ICommand
     {
         public async Task Execute(ITpLinkClient powerLine)
         {
+            Console.WriteLine("turning on 5ghz and 2.4ghz signal!");
             await powerLine.ChangeWireless5GStatusAsync(true);
             await powerLine.ChangeWireless2GStatusAsync(true);
         }
